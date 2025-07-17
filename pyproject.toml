@@ -1,0 +1,102 @@
+[tool.black]
+line-length = 100
+
+# includes the data_sources files
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["modules"]
+namespaces = true
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = []
+filterwarnings = [
+    'ignore::DeprecationWarning:geopandas._compat'
+]
+[project]
+name = "ngiab_data_preprocess"
+#version = "0.0.1"
+dynamic = ["version"]
+authors = [
+    { name = "Josh Cunningham", email = "jcunningham8@ua.edu" },
+    { name = "Chad Perry", email = "bcperry2@crimson.ua.edu" }
+]
+description = "Graphical Tools for viewing forecast data."
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pyogrio>=0.7.2",
+    "pyproj>=3.6.1",
+    "Flask==3.0.2",
+    "geopandas>=1.0.0",
+    "requests==2.32.4",
+    "igraph==0.11.4",
+    "s3fs==2024.3.1",
+    "xarray==2024.2.0",
+    "zarr==2.17.1",
+    "netCDF4>=1.6.5",
+    "dask==2024.4.1",
+    "dask[distributed]==2024.4.1",
+    "h5netcdf==1.3.0",
+    "exactextract==0.2.0",
+    "numpy>=1.26.4",
+    "tqdm==4.66.4",
+    "rich==13.7.1",
+    "colorama==0.4.6",
+    "bokeh==3.5.1",
+    "boto3",
+    "numcodecs<0.16.0",
+    "scipy>=1.15.3",
+]
+
+[build-system]
+# scm adds files tracked by git to the package
+requires = ["setuptools>=69.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = ["pytest>=8.3.5", "ruff>=0.11.9"]
+
+
+[tool.ruff]
+line-length = 100
+exclude = [
+    ".html",
+    ".js",
+    ".css",
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]

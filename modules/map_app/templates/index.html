@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Application</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/toggle.css') }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://unpkg.com/maplibre-gl@^5.2.0/dist/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/pmtiles@latest/dist/pmtiles.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@^5.2.0/dist/maplibre-gl.css" rel="stylesheet" />
+</head>
+
+<body>
+    <header>
+        <h1>Select catchments by clicking!</h1>
+    </header>
+
+    <main>
+        <section id="map-container">
+            <div id="map">
+                <button id="toggle-button-gages">Show gages</button> 
+                <button id="toggle-button-camels">Show CAMELS basins</button>
+                <button id="toggle-button-nwm">Overlay NWM chunks</button>
+                <button id="toggle-button-aorc">Overlay AORC chunks</button>
+            </div>
+
+            <div class="command-container">
+                <div class="command-header">
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="runcmd-toggle" class="toggle-input">
+                            <label for="runcmd-toggle" class="toggle-label">
+                                <span class="toggle-text toggle-text-left">UVX</span>
+                                <span class="toggle-text toggle-text-right">Pip</span>
+                                <span class="toggle-handle"></span>
+                            </label>
+                        </div>
+                    <span>Command</span>
+                    <button id="copy-to-clip" class="copy-button" aria-label="Copy to clipboard">
+                        <svg class="copy-icon" viewBox="0 0 16 16" width="16" height="16">
+                            <path fill-rule="evenodd" d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"></path>
+                            <path fill-rule="evenodd" d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"></path>
+                        </svg>
+                        <span class="copy-text">Copy</span>
+                    </button>
+                </div>
+                <div id="command-builder">
+                    <div id="cli-prefix" class="command-content">uvx --from ngiab_data_preprocess cli </div>
+                    <div id="cli-command" class="command-content"></div>
+                </div>
+            </div>
+            <script>
+                document.getElementById('copy-to-clip').addEventListener('click', async function() {
+                    const commandPrefix = document.getElementById('cli-prefix').textContent;
+                    const commandText = document.getElementById('cli-command').textContent;
+                    if (commandPrefix && !commandPrefix.endsWith(' ')) {
+                        // Ensure there's a space after the prefix
+                        commandPrefix += ' ';
+                    }
+                    const full_command = commandPrefix + commandText;
+                    const button = this;
+
+                    try {
+                        await navigator.clipboard.writeText(full_command);
+
+                        // Update button state
+                        button.classList.add('copied');
+                        const copyText = button.querySelector('.copy-text');
+                        const originalText = copyText.textContent;
+                        copyText.textContent = 'Copied!';
+
+                        // Reset button state after 2 seconds
+                        setTimeout(() => {
+                            button.classList.remove('copied');
+                            copyText.textContent = originalText;
+                        }, 2000);
+                    } catch (err) {
+                        console.error('Failed to copy text:', err);
+                    }
+                });
+            </script>
+            <h2>For selection by gage id please use the cli.</h2>
+        </section>
+        <section id="basins-container">
+            <h2>Selected Basins</h2>
+            <div id="selected-basins">None - get clicking!</div>
+            <button id="subset-button">Create subset gpkg</button>
+            <img class="loading" src="{{ url_for('static', filename='resources/loading.gif') }}" alt="Loading"
+                id="subset-loading">
+            <!-- <button id="subset-to-file-button">Output list of upstreams to file</button>
+            <img class="loading" src="{{ url_for('static', filename='resources/loading.gif') }}" alt="Loading"
+                id="subset-to-file-loading"> -->
+            <div id="output-info">
+                <strong>Output folder is configured in the ~/.ngiab/preprocessor file</strong>
+            </div>
+            <div id="output-path"></div>
+        </section>
+
+        <section id="time-settings">
+            <div class="time-input">
+                <label for="start-time">Start Time:</label>
+                <input type="datetime-local" id="start-time" name="start-time" value="2010-01-01T00:00">
+            </div>
+            <div class="time-input">
+                <label for="end-time">End Time:</label>
+                <input type="datetime-local" id="end-time" name="end-time" value="2010-01-02T00:00">
+            </div>
+        </section>
+
+    </main>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/console.css') }}">
+    <div id="console" class="minimized">
+        <div class="center">
+            <button id="toggleConsole">Show Console</button>
+        </div>
+        <div id="logOutput"></div>
+    </div>
+    <script src="{{ url_for('static', filename='js/console.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/data_processing.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js' ) }}"></script>
+
+</body>
+
+</html>
