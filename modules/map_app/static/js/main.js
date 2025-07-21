@@ -10,34 +10,34 @@ var colorDict = {
   clearFill: getComputedStyle(document.documentElement).getPropertyValue('--clear-fill')
 };
 
-// A function that creates a cli command from the interface
-function create_cli_command() {
-  const cliPrefix = document.getElementById("cli-prefix");
-  cliPrefix.style.opacity = 1;
-  var selected_basins = $("#selected-basins").text();
-  var start_time = document.getElementById("start-time").value.split("T")[0];
-  var end_time = document.getElementById("end-time").value.split("T")[0];
-  var command = `-i ${selected_basins} --subset --start ${start_time} --end ${end_time} --forcings --realization --run`;
-  var command_all = `-i ${selected_basins} --start ${start_time} --end ${end_time} --all`;
-  if (selected_basins != "None - get clicking!") {
-    $("#cli-command").text(command);
-  }
-}
+// // A function that creates a cli command from the interface
+// function create_cli_command() {
+//   const cliPrefix = document.getElementById("cli-prefix");
+//   cliPrefix.style.opacity = 1;
+//   var selected_basins = $("#selected-basins").text();
+//   var start_time = document.getElementById("start-time").value.split("T")[0];
+//   var end_time = document.getElementById("end-time").value.split("T")[0];
+//   var command = `-i ${selected_basins} --subset --start ${start_time} --end ${end_time} --forcings --realization --run`;
+//   var command_all = `-i ${selected_basins} --start ${start_time} --end ${end_time} --all`;
+//   if (selected_basins != "None - get clicking!") {
+//     $("#cli-command").text(command);
+//   }
+// }
 
-function updateCommandPrefix() {
-  const toggleInput = document.getElementById("runcmd-toggle");
-  const cliPrefix = document.getElementById("cli-prefix");
-  const uvxText = "uvx --from ngiab_data_preprocess cli";
-  const pythonText = "python -m ngiab_data_cli";
-  // Set initial handle text based on the default state using data attribute
-  cliPrefix.textContent = toggleInput.checked ? pythonText : uvxText;
-}
-document.getElementById("runcmd-toggle").addEventListener('change', updateCommandPrefix);
+// function updateCommandPrefix() {
+//   const toggleInput = document.getElementById("runcmd-toggle");
+//   const cliPrefix = document.getElementById("cli-prefix");
+//   const uvxText = "uvx --from ngiab_data_preprocess cli";
+//   const pythonText = "python -m ngiab_data_cli";
+//   // Set initial handle text based on the default state using data attribute
+//   cliPrefix.textContent = toggleInput.checked ? pythonText : uvxText;
+// }
+// document.getElementById("runcmd-toggle").addEventListener('change', updateCommandPrefix);
 
-// These functions are exported by data_processing.js
-document.getElementById('map').addEventListener('click', create_cli_command);
-document.getElementById('start-time').addEventListener('change', create_cli_command);
-document.getElementById('end-time').addEventListener('change', create_cli_command);
+// // These functions are exported by data_processing.js
+// document.getElementById('map').addEventListener('click', create_cli_command);
+// document.getElementById('start-time').addEventListener('change', create_cli_command);
+// document.getElementById('end-time').addEventListener('change', create_cli_command);
 
 
 // add the PMTiles plugin to the maplibregl global.

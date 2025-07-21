@@ -16,9 +16,9 @@
 </head>
 
 <body>
-    <header>
+    <!-- <header>
         <h1>Select catchments by clicking!</h1>
-    </header>
+    </header> -->
 
     <main>
         <section id="map-container">
@@ -29,7 +29,7 @@
                 <button id="toggle-button-aorc">Overlay AORC chunks</button>
             </div>
 
-            <div class="command-container">
+            <!-- <div class="command-container">
                 <div class="command-header">
                         <div class="toggle-switch">
                             <input type="checkbox" id="runcmd-toggle" class="toggle-input">
@@ -52,8 +52,8 @@
                     <div id="cli-prefix" class="command-content">uvx --from ngiab_data_preprocess cli </div>
                     <div id="cli-command" class="command-content"></div>
                 </div>
-            </div>
-            <script>
+            </div> -->
+            <!-- <script>
                 document.getElementById('copy-to-clip').addEventListener('click', async function() {
                     const commandPrefix = document.getElementById('cli-prefix').textContent;
                     const commandText = document.getElementById('cli-command').textContent;
@@ -82,23 +82,20 @@
                         console.error('Failed to copy text:', err);
                     }
                 });
-            </script>
-            <h2>For selection by gage id please use the cli.</h2>
+            </script> -->
+            <!-- <h2>For selection by gage id please use the cli.</h2> -->
         </section>
-        <section id="basins-container">
+        <!-- <section id="basins-container">
             <h2>Selected Basins</h2>
             <div id="selected-basins">None - get clicking!</div>
             <button id="subset-button">Create subset gpkg</button>
             <img class="loading" src="{{ url_for('static', filename='resources/loading.gif') }}" alt="Loading"
                 id="subset-loading">
-            <!-- <button id="subset-to-file-button">Output list of upstreams to file</button>
-            <img class="loading" src="{{ url_for('static', filename='resources/loading.gif') }}" alt="Loading"
-                id="subset-to-file-loading"> -->
             <div id="output-info">
                 <strong>Output folder is configured in the ~/.ngiab/preprocessor file</strong>
             </div>
             <div id="output-path"></div>
-        </section>
+        </section> -->
 
         <section id="time-settings">
             <div class="time-input">
