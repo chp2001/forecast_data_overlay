@@ -56,6 +56,9 @@ dependencies = [
     "boto3",
     "numcodecs<0.16.0",
     "scipy>=1.15.3",
+    "fsspec>=2024.3.1",
+    "ujson>=5.10.0",
+    "joblib>=1.5.1",
 ]
 
 [build-system]
