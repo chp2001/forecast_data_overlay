@@ -197,25 +197,11 @@ def selecturlbase(
         return urlbasedict[urlbaseinput]
     else:
         return defaulturlbase
-
-def create_file_list(
-    runinput: NWMRun,
-    varinput: NWMVar,
-    geoinput: NWMGeo,
-    meminput: Optional[NWMMem] = None,
+    
+def make_daterange(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    fcst_cycle: Optional[List[int]] = None,
-    urlbaseinput: Optional[int] = None,
-    lead_time: Optional[List[int]] = None,
-) -> List[str]:
-    """For given date, run, var, fcst_cycle, and geography, return file names for the valid time and dates."""
-
-    geography = selectgeo(geoinput)
-    run_name = selectrun(runinput)
-    var_name = selectvar(varinput)
-    urlbase_prefix = selecturlbase(urlbasedict, urlbaseinput)
-
+)->List[datetime]:
     try:
         _dtstart = (
             datetime.strptime(start_date, "%Y%m%d%H%M")
@@ -233,6 +219,27 @@ def create_file_list(
         dtstart=_dtstart,
         until=_until,
     )
+    return list(dates)
+
+def create_file_list(
+    runinput: NWMRun,
+    varinput: NWMVar,
+    geoinput: NWMGeo,
+    meminput: Optional[NWMMem] = None,
+    dates: Optional[List[datetime]] = None,
+    fcst_cycle: Optional[List[int]] = None,
+    urlbaseinput: Optional[int] = None,
+    lead_time: Optional[List[int]] = None,
+) -> List[str]:
+    """For given date, run, var, fcst_cycle, and geography, return file names for the valid time and dates."""
+
+    geography = selectgeo(geoinput)
+    run_name = selectrun(runinput)
+    var_name = selectvar(varinput)
+    urlbase_prefix = selecturlbase(urlbasedict, urlbaseinput)
+
+    if not dates:
+        dates = make_daterange()
     run_t = run_type(runinput, varinput, geoinput, run_name)
     fhp = fhprefix(runinput)
     vsuff = varsuffix(meminput)
@@ -433,6 +440,33 @@ def create_file_list(
         )
     return result
 
+def create_file_list_range(
+    runinput: NWMRun,
+    varinput: NWMVar,
+    geoinput: NWMGeo,
+    meminput: Optional[NWMMem] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    fcst_cycle: Optional[List[int]] = None,
+    urlbaseinput: Optional[int] = None,
+    lead_time: Optional[List[int]] = None,
+) -> List[str]:
+    """Creates a file list for the specified date range."""
+    # Create a list of dates within the specified range
+    dates = make_daterange(start_date=start_date, end_date=end_date)
+
+    # Generate the file list using the provided parameters
+    return create_file_list(
+        runinput=runinput,
+        varinput=varinput,
+        geoinput=geoinput,
+        meminput=meminput,
+        dates=dates,
+        fcst_cycle=fcst_cycle,
+        urlbaseinput=urlbaseinput,
+        lead_time=lead_time,
+    )
+
 # Version of create_file_list that uses the 8th URL base by default
 def create_default_file_list(
     runinput: NWMRun,
@@ -445,7 +479,7 @@ def create_default_file_list(
     lead_time: Optional[List[int]] = None,
 ) -> List[str]:
     """Creates a file list using the 8th URL base by default."""
-    return create_file_list(
+    return create_file_list_range(
         runinput=runinput,
         varinput=varinput,
         geoinput=geoinput,
@@ -456,6 +490,37 @@ def create_default_file_list(
         urlbaseinput=8,  # Default to the 8th URL base
         lead_time=lead_time,
     )
+    
+def get_default_file(
+    runinput: NWMRun,
+    varinput: NWMVar,
+    geoinput: NWMGeo,
+    meminput: Optional[NWMMem] = None,
+    date: Optional[Union[str, datetime]] = None,
+    fcst_cycle: Optional[List[int]] = None,
+    lead_time: Optional[List[int]] = None,
+)->str:
+    """Generates a default file name based on the provided parameters."""
+    if isinstance(date, str):
+        date = datetime.strptime(date, "%Y%m%d%H%M")
+    elif date is None:
+        date = datetime.now(timezone.utc)
+
+    # Create a single-item list for dates
+    dates = [date]
+
+    # Generate the file list and return the first item
+    file_list = create_file_list(
+        runinput=runinput,
+        varinput=varinput,
+        geoinput=geoinput,
+        meminput=meminput,
+        dates=dates,
+        fcst_cycle=fcst_cycle,
+        lead_time=lead_time,
+    )
+    
+    return file_list[0] if file_list else ""
 
 def append_jsons(file_list: List[str]) -> List[str]:
     """Appends '.json' to each file in the list."""
@@ -475,7 +540,7 @@ def generate_urls(
     
     default_urlbase = selecturlbase(urlbasedict, 8)
     
-    file_list = create_file_list(
+    file_list = create_file_list_range(
         runinput,
         varinput,
         geoinput,

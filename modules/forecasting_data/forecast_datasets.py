@@ -13,15 +13,15 @@ from forecasting_data.urlgen_enums import NWMRun, NWMVar, NWMGeo, NWMMem
 from forecasting_data.urlgen_builder import create_default_file_list, append_jsons
 from data_processing.dask_utils import use_cluster
 
-fs2 = fsspec.filesystem("")
+# fs2 = fsspec.filesystem("")
 
-def make_mzz():
-    json_list = glob.glob("/home/shared/GOES_DA/swe_new/ncjson/*.json")
-    mzz = MultiZarrToZarr(json_list, concat_dims=["t"], identical_dims=["x", "y"])
-    d = mzz.translate()
+# def make_mzz():
+#     json_list = glob.glob("/home/shared/GOES_DA/swe_new/ncjson/*.json")
+#     mzz = MultiZarrToZarr(json_list, concat_dims=["t"], identical_dims=["x", "y"])
+#     d = mzz.translate()
 
-    with fs2.open("/home/shared/GOES_DA/swe_new/combined.json", "wb") as f:
-        f.write(ujson.dumps(d).encode())
+#     with fs2.open("/home/shared/GOES_DA/swe_new/combined.json", "wb") as f:
+#         f.write(ujson.dumps(d).encode())
 
 def load_dataset_from_json(file_path: str) -> xr.Dataset:
     """
@@ -105,8 +105,8 @@ def load_forecasted_forcings(
     Load forecasted forcing datasets as zarr files for a specified date range.
     
     Args:
-        start_date (str): Start date in 'YYYYMMDDHHMM' format.
-        end_date (str): End date in 'YYYYMMDDHHMM' format.
+        start_date (str): Start date in 'YYYYMMDD' format.
+        end_date (str): End date in 'YYYYMMDD' format.
     
     Returns:
         List[xr.Dataset]: List of xarray Datasets containing the forecasted forcings.
@@ -140,6 +140,49 @@ def load_forecasted_forcings(
         datasets = load_datasets(file_list)
     return datasets
 
+def load_forecasted_forcing(
+    date: str,
+    fcst_cycle: int = 0,
+    lead_time: int = 1,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    geosource: NWMGeo = NWMGeo.CONUS,
+    mem: Optional[NWMMem] = None,
+) -> xr.Dataset:
+    """
+    Load a single forecasted forcing dataset for a specified date, forecast cycle, and lead time.
+    Args:
+        date (str): Date in 'YYYYMMDD' format.
+        fcst_cycle (int): Forecast cycle hour (default is 0).
+        lead_time (int): Lead time in hours (default is 1).
+        runtype (NWMRun): Type of NWM run (default is NWMRun.SHORT_RANGE).
+        geosource (NWMGeo): Geographic source of the data (default is NWMGeo.CONUS).
+        mem (Optional[NWMMem]): Memory ensemble member (default is None).
+    Returns:
+        xr.Dataset: Loaded xarray Dataset containing the forecasted forcing.
+    """
+    if not date:
+        raise ValueError("Date must be provided.")
+    # Create a file list for the specified date, forecast cycle, and lead time
+    file_list = create_default_file_list(
+        runinput=runtype,
+        varinput=NWMVar.FORCING,
+        geoinput=geosource,
+        meminput=mem,
+        start_date=date,
+        end_date=date,
+        fcst_cycle=[fcst_cycle],
+        lead_time=[lead_time],
+    )
+    assert len(file_list) == 1, f"Expected exactly one file for the specified parameters, got {len(file_list)}."
+    # Append .json to the file urls
+    file_list = append_jsons(file_list)
+    
+    # Load the dataset from the file list
+    datasets = load_datasets(file_list)
+    if not datasets:
+        raise ValueError("No datasets found for the specified parameters.")
+    return datasets[0]
+
 @use_cluster
 def merge_datasets(datasets: List[xr.Dataset]) -> xr.Dataset:
     """
@@ -165,17 +208,27 @@ if __name__ == "__main__":
     datasets = load_forecasted_forcings(
         start_date=start_date,
         end_date=end_date,
-        fcst_cycle=[0, 6, 12, 18],
-        lead_times=[1, 2, 3],
+        # fcst_cycle=[0, 6, 12, 18],
+        # lead_times=[1, 2, 3],
+        fcst_cycle=[0],
+        lead_times=[1],
         parallel=True,
     )
     t1 = time.perf_counter()
     print(f"Loaded {len(datasets)} datasets in {t1 - t0:.2f} seconds")
-    print(datasets[0])  # Print the first dataset for verification
-    print(f"Merging datasets...")
-    t2 = time.perf_counter()
-    merged_dataset = merge_datasets(datasets)
-    t3 = time.perf_counter()
-    print(f"Merged dataset created in {t3 - t2:.2f} seconds")
-    print(merged_dataset)  # Print the merged dataset for verification
-    print(f"Total time taken: {t3 - t0:.2f} seconds")
+    # print(datasets[0])  # Print the first dataset for verification
+    # print(datasets[1])  # Print the first dataset for verification
+    
+    # Check that single dataset loading works
+    single_dataset = load_forecasted_forcing(
+        date="202301010000",
+    )
+    print(f"Single dataset loaded: {single_dataset}")
+    
+    # print(f"Merging datasets...")
+    # t2 = time.perf_counter()
+    # merged_dataset = merge_datasets(datasets)
+    # t3 = time.perf_counter()
+    # print(f"Merged dataset created in {t3 - t2:.2f} seconds")
+    # print(merged_dataset)  # Print the merged dataset for verification
+    # print(f"Total time taken: {t3 - t0:.2f} seconds")

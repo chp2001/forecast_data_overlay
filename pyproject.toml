@@ -59,6 +59,7 @@ dependencies = [
     "fsspec>=2024.3.1",
     "ujson>=5.10.0",
     "joblib>=1.5.1",
+    "kerchunk>=0.2.7",
 ]
 
 [build-system]
