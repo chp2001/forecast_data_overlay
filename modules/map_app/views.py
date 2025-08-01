@@ -158,17 +158,21 @@ def get_forecast_precip():
         # Dataset is a 3d array with dimensions (time, x, y)
         # The requested data contains only the first time step
         # Ideally we store the data in the dict with `"{x},{y}": value` pairs
+        print(f"Grabbing values from precip_data with shape {precip_data.shape}")
         for x in range(precip_data.shape[1]):
             for y in range(precip_data.shape[2]):
-                value = precip_data[0, x, y].item()
+                value = precip_data[0, x, y].values.item()  # Get the value as a float
                 data_dict[f"{x},{y}"] = value
+        print(f"Data dict created with {len(data_dict)} entries. Converting to JSON.")
+        # Convert the data_dict to JSON
         data_json = json.dumps(data_dict)
+        print(f"Data JSON created with length {len(data_json)}")
         logger.info(
             f"Forecasted precipitation data loaded successfully for {selected_time} ; {forecast_cycle} ; {lead_time}"
         )
         return jsonify(data_json), 200
     except Exception as e:
-        print(f"Error loading forecasted forcing")
+        print("Error loading forecasted forcing")
         print(str(e))
         print(traceback.format_exc())
         logger.error(f"Error loading forecasted forcing: {str(e)}")

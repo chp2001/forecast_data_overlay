@@ -225,62 +225,191 @@ def merge_datasets(datasets: List[xr.Dataset]) -> xr.Dataset:
 if __name__ == "__main__":
     import time
 
-    # Example usage
-    start_date = "202301010000"  # January 1, 2023
-    end_date = "202301010000"  # January 2, 2023
-    t0 = time.perf_counter()
-    datasets = load_forecasted_forcings(
-        start_date=start_date,
-        end_date=end_date,
-        # fcst_cycle=[0, 6, 12, 18],
-        # lead_times=[1, 2, 3],
-        fcst_cycle=[0],
-        # fcst_cycle=list(range(0, 5)),
-        # fcst_cycle=list(range(0, 24)),
-        lead_times=[1],
-        parallel=True,
-    )
-    t1 = time.perf_counter()
-    print(f"Loaded {len(datasets)} datasets in {t1 - t0:.2f} seconds")
+    do_caching = True
+    datasets: List[xr.Dataset] = []
+    if do_caching:
+        import pickle
 
-    def timetest_grab_ns(num: int) -> int:
-        before = time.perf_counter_ns()
-        test_date = "202301010000"
-        test_dataset = load_forecasted_forcings(
-            start_date=test_date,
-            end_date=test_date,
-            fcst_cycle=list(range(0, num + 1)),
+        try:
+            with open("./dist/forecasted_forcings_cache.pkl", "rb") as f:
+                datasets = pickle.load(f)
+            print(f"Loaded {len(datasets)} cached datasets.")
+            got_data = True
+        except FileNotFoundError:
+            pass
+    if not datasets:
+        # Example usage
+        start_date = "202301010000"  # January 1, 2023
+        end_date = "202301010000"  # January 2, 2023
+        t0 = time.perf_counter()
+        datasets = load_forecasted_forcings(
+            start_date=start_date,
+            end_date=end_date,
+            # fcst_cycle=[0, 6, 12, 18],
+            # lead_times=[1, 2, 3],
+            fcst_cycle=[0],
+            # fcst_cycle=list(range(0, 5)),
+            # fcst_cycle=list(range(0, 24)),
             lead_times=[1],
             parallel=True,
         )
-        after = time.perf_counter_ns()
-        print(f"Finished loading {num}")
-        return after - before
+        t1 = time.perf_counter()
+        print(f"Loaded {len(datasets)} datasets in {t1 - t0:.2f} seconds")
+        if do_caching:
+            with open("./dist/forecasted_forcings_cache.pkl", "wb") as f:
+                pickle.dump(datasets, f)
+            print("Cached datasets to ./dist/forecasted_forcings_cache.pkl")
 
-    # timetests = [timetest_grab_ns(i) for i in range(0, 24)]
-    # from matplotlib import pyplot as plt
+    access_test = True
+    if access_test:
+        # Verify accessing individual values
+        first_dataset = datasets[0]
+        print(f"First dataset loaded with type: {type(first_dataset)=}")
+        print(f"First dataset dimensions: {first_dataset.dims=}")
+        print(f"First dataset variables: {list(first_dataset.data_vars)=}")
+        fst_rainrate: xr.DataArray = first_dataset.RAINRATE
+        print(f"First rainrate loaded with shape: {fst_rainrate.shape=}")
+        rainrate_test0 = fst_rainrate[0]
+        print(f"Test access 0: {rainrate_test0=}, type: {type(rainrate_test0)=}")
+        # Interesting!! It reduced the shape (1, 3840, 4608) to (3840, 4608)!
+        # It simplifies away the redundant time dimension!
+        rainrate_test1 = fst_rainrate[0, 0, 0]
+        print(f"Test access 1: {rainrate_test1=}, type: {type(rainrate_test1)=}")
+        # It's a 4B xarray.DataArray with a single float value?
+        # How do we get the value out of it? xarray.DataArray does not have a .item() method.
+        rainrate_test2 = rainrate_test1.values
+        print(f"Test access 2: {rainrate_test2=}, type: {type(rainrate_test2)=}")
+        # It's a numpy ndarray with a single float value...
+        rainrate_test3 = rainrate_test2.item()
+        print(f"Test access 3: {rainrate_test3=}, type: {type(rainrate_test3)=}")
 
-    # timetests = [i / 1e6 for i in timetests]  # Convert to milliseconds
-    # plt.plot(timetests)
-    # plt.xlabel("Number of Forecast Cycles")
-    # plt.ylabel("Time (ms)")
-    # plt.title("Time to Load Forecasted Forcings vs. Number of Forecast Cycles")
-    # plt.grid()
-    # plt.savefig("dist/forecasted_forcings_load_time.png")
+        # try making an 'access function'
+        def access_rainrate(
+            dataset: xr.Dataset, time_index: int, x_index: int, y_index: int
+        ) -> float:
+            """
+            Access the rainrate value at specified indices in the dataset.
 
-    # print(datasets[0])  # Print the first dataset for verification
-    # print(datasets[1])  # Print the first dataset for verification
+            Args:
+                dataset (xr.Dataset): The xarray Dataset containing the rainrate data.
+                time_index (int): The index of the time dimension.
+                x_index (int): The index of the x dimension.
+                y_index (int): The index of the y dimension.
 
-    # Check that single dataset loading works
-    # single_dataset = load_forecasted_forcing(
-    #     date="202301010000",
-    # )
-    # print(f"Single dataset loaded: {single_dataset}")
+            Returns:
+                float: The rainrate value at the specified indices.
+            """
+            return dataset.RAINRATE[time_index, x_index, y_index].values.item()
 
-    # print(f"Merging datasets...")
-    # t2 = time.perf_counter()
-    # merged_dataset = merge_datasets(datasets)
-    # t3 = time.perf_counter()
-    # print(f"Merged dataset created in {t3 - t2:.2f} seconds")
-    # print(merged_dataset)  # Print the merged dataset for verification
-    # print(f"Total time taken: {t3 - t0:.2f} seconds")
+        # Is this necessary in practice? Probably not, as long as we remember to use .values.item() when accessing individual values.
+
+        # Actually. Is this a good way to do this? Let's compare individual access vs whole array access when iterating over the dataset.
+        # Let's time it!
+        t0 = time.perf_counter()
+        last_printed_time = t0
+        print("Starting individual access test...")
+        indiv_values_0 = []
+        total_values = fst_rainrate.shape[1] * fst_rainrate.shape[2]
+        print(f"Total values to access: {total_values}")
+
+        def estimated_time_remaining(start_time: float, total: int, amount_done: int) -> float:
+            elapsed = time.perf_counter() - start_time
+            if amount_done == 0:
+                return float("inf")
+            rate = elapsed / amount_done
+            remaining = total - amount_done
+            return remaining * rate
+
+        for x in range(fst_rainrate.shape[1]):
+            if time.perf_counter() - last_printed_time > 1:
+                print(f"Accessing {x}th x index at {time.perf_counter() - t0:.2f} seconds")
+                estimated_time = estimated_time_remaining(t0, total_values, len(indiv_values_0))
+                if estimated_time > 180:
+                    print(
+                        f"Estimated time ({estimated_time:.2f} seconds) exceeds 3 minutes, stopping early."
+                    )
+                    break
+                print(f"Estimated time remaining: {estimated_time:.2f} seconds")
+                last_printed_time = time.perf_counter()
+            for y in range(fst_rainrate.shape[2]):
+                if time.perf_counter() - last_printed_time > 1:
+                    print(
+                        f"Accessing {x},{y}th (x,y) index at {time.perf_counter() - t0:.2f} seconds"
+                    )
+                    estimated_time = estimated_time_remaining(t0, total_values, len(indiv_values_0))
+                    if estimated_time > 180:
+                        print(
+                            f"Estimated time ({estimated_time:.2f} seconds) exceeds 3 minutes, stopping early."
+                        )
+                        break
+                    print(f"Estimated time remaining: {estimated_time:.2f} seconds")
+                    last_printed_time = time.perf_counter()
+                value = fst_rainrate[0, x, y].values.item()
+                indiv_values_0.append(value)
+        t1 = time.perf_counter()
+        print(f"Time taken for individual access: {t1 - t0:.2f} seconds")
+        t2 = time.perf_counter()
+        # Now let's access the whole array at once
+        whole_array = fst_rainrate[0].values  # This gets the whole array for the first time step
+        last_printed_time = t2
+        print("Starting whole array access test...")
+        whole_values_0 = []
+        for x in range(whole_array.shape[0]):
+            if time.perf_counter() - last_printed_time > 1:
+                print(f"Accessing {x}th x index at {time.perf_counter() - t2:.2f} seconds")
+                last_printed_time = time.perf_counter()
+            for y in range(whole_array.shape[1]):
+                if time.perf_counter() - last_printed_time > 1:
+                    print(
+                        f"Accessing {x},{y}th (x,y) index at {time.perf_counter() - t2:.2f} seconds"
+                    )
+                    last_printed_time = time.perf_counter()
+                value = whole_array[x, y].item()
+                whole_values_0.append(value)
+        t3 = time.perf_counter()
+        print(f"Time taken for whole array access: {t3 - t2:.2f} seconds")
+
+    do_timetest = False
+    if do_timetest:
+
+        def timetest_grab_ns(num: int) -> int:
+            before = time.perf_counter_ns()
+            test_date = "202301010000"
+            test_dataset = load_forecasted_forcings(
+                start_date=test_date,
+                end_date=test_date,
+                fcst_cycle=list(range(0, num + 1)),
+                lead_times=[1],
+                parallel=True,
+            )
+            after = time.perf_counter_ns()
+            print(f"Finished loading {num}")
+            return after - before
+
+        # timetests = [timetest_grab_ns(i) for i in range(0, 24)]
+        # from matplotlib import pyplot as plt
+
+        # timetests = [i / 1e6 for i in timetests]  # Convert to milliseconds
+        # plt.plot(timetests)
+        # plt.xlabel("Number of Forecast Cycles")
+        # plt.ylabel("Time (ms)")
+        # plt.title("Time to Load Forecasted Forcings vs. Number of Forecast Cycles")
+        # plt.grid()
+        # plt.savefig("dist/forecasted_forcings_load_time.png")
+
+        # print(datasets[0])  # Print the first dataset for verification
+        # print(datasets[1])  # Print the first dataset for verification
+
+        # Check that single dataset loading works
+        # single_dataset = load_forecasted_forcing(
+        #     date="202301010000",
+        # )
+        # print(f"Single dataset loaded: {single_dataset}")
+
+        # print(f"Merging datasets...")
+        # t2 = time.perf_counter()
+        # merged_dataset = merge_datasets(datasets)
+        # t3 = time.perf_counter()
+        # print(f"Merged dataset created in {t3 - t2:.2f} seconds")
+        # print(merged_dataset)  # Print the merged dataset for verification
+        # print(f"Total time taken: {t3 - t0:.2f} seconds")
