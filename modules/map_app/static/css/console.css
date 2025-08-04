@@ -43,3 +43,7 @@
     width: 100%;
     overflow: hidden;
 }
+/* When user hovers over toggle button, make it partially transparent to reveal any obscured text */
+#toggleConsole:hover {
+    opacity: 0.8;
+}

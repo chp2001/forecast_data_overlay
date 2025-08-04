@@ -144,6 +144,7 @@ import traceback
 @main.route("/get_forecast_precip", methods=["GET"])
 def get_forecast_precip():
     """Get the forecast precipitation for the selected arguments."""
+    start_command = perf_counter()
     selected_time = intra_module_db.get("selected_time")
     forecast_cycle = intra_module_db.get("forecast_cycle")
     lead_time = intra_module_db.get("lead_time")
@@ -222,22 +223,37 @@ def get_forecast_precip():
         )
         print(f"Data JSON created with length {len(data_json)}")
         logger.info(
-            f"Forecasted precipitation data loaded successfully for {selected_time} ; {forecast_cycle} ; {lead_time}"
+            (
+                f"Forecasted precipitation data loaded successfully in {after_json_conversion - start_command:.2f} seconds for {selected_time} ; {forecast_cycle} ; {lead_time}"
+            )
         )
         return jsonify(data_json), 200
     except Exception as e:
         print("Error loading forecasted forcing")
         print(str(e))
         print(traceback.format_exc())
-        logger.error(f"Error loading forecasted forcing: {str(e)}")
+        logger.error(
+            (
+                f"Error loading forecasted forcing"
+                f" in {perf_counter() - start_command:.2f} seconds: "
+                f"{str(e)}"
+            )
+        )
         return jsonify({"error": str(e)}), 500
 
 
 @main.route("/get_forecasted_forcing_grid", methods=["GET"])
 def get_forecasted_forcing_grid():
     """Get forecasting gridlines to display on the map."""
+    start_command = perf_counter()
     horiz_gridlines = get_forecasting_gridlines_horiz_projected()
     vert_gridlines = get_forecasting_gridlines_vert_projected()
     if horiz_gridlines is None or vert_gridlines is None:
+        logger.error(
+            f"Failed to load forecasting gridlines in {perf_counter() - start_command:.2f} seconds"
+        )
         return jsonify({"error": "Failed to load forecasting gridlines"}), 500
+    logger.info(
+        f"Forecasting gridlines loaded successfully in {perf_counter() - start_command:.2f} seconds"
+    )
     return jsonify({"horiz_gridlines": horiz_gridlines, "vert_gridlines": vert_gridlines}), 200
