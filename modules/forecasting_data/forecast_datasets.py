@@ -4,7 +4,7 @@ if __name__ == "__main__":
     import sys
 
     sys.path.append("./modules/")
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Callable
 import xarray as xr
 import fsspec
 import ujson
@@ -310,6 +310,26 @@ def get_example_dataset_rescaled(scaleX: int = 16, scaleY: int = 16) -> xr.Datas
         example_dataset = rescale_dataset(example_dataset, scaleX=scaleX, scaleY=scaleY)
     return example_dataset
 
+@cache
+def get_example_dataset_precip(
+    scaleX: int = 16, scaleY: int = 16
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Get the precipitation data from the example dataset, rescaled by the specified factors.
+
+    Args:
+        scaleX (int): The factor by which to rescale the x dimension.
+        scaleY (int): The factor by which to rescale the y dimension.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray]: A tuple containing:
+            - Precipitation data as a 2D numpy array with shape (y, x).
+            - X coordinates as a 1D numpy array.
+            - Y coordinates as a 1D numpy array.
+    """
+    example_dataset = get_example_dataset_rescaled(scaleX=scaleX, scaleY=scaleY)
+    return get_dataset_precip(example_dataset)
+
 
 # @cache
 # def get_forecasting_grid(scaleX: int = 16, scaleY: int = 16) -> List[List[Tuple[float, float]]]:
@@ -463,6 +483,25 @@ def reproject_points(
     reprojected_points = [transformer.transform(x, y) for x, y in points]
     return reprojected_points
 
+def reproject_points_2d(
+    dataset: xr.Dataset,
+    points: List[List[Tuple[float, float]]],
+) -> List[List[Tuple[float, float]]]:
+    """
+    Reproject a 2D list of points from the dataset's projection to EPSG:4326.
+
+    Args:
+        dataset (xr.Dataset): The xarray Dataset containing the precipitation data.
+        points (List[List[Tuple[float, float]]]): 2D list of tuples containing (x, y) coordinates.
+
+    Returns:
+        List[List[Tuple[float, float]]]: 2D list of reprojected (longitude, latitude) coordinates.
+    """
+    current_projection = get_precip_projection(dataset)
+    target_projection = "EPSG:4326"
+    transformer = pyproj.Transformer.from_crs(current_projection, target_projection, always_xy=True)
+    reprojected_points = [[transformer.transform(x, y) for x, y in row] for row in points]
+    return reprojected_points
 
 @cache
 def get_forecasting_gridlines_vert_projected(
@@ -510,7 +549,7 @@ def rescale_dataset(
         raise ValueError("Dataset does not contain 'RAINRATE' variable.")
     precip_data = dataset["RAINRATE"]
     # Rescale the data by collapsing the specified number of points
-    rescaled_data: xr.DataArray = precip_data.coarsen(x=scaleX, y=scaleY, boundary="exact").sum()
+    rescaled_data: xr.DataArray = precip_data.coarsen(x=scaleX, y=scaleY, boundary="exact").mean()
     print(
         f"Rescaled data from shape {precip_data.shape} to {rescaled_data.shape} using scaleX={scaleX}, scaleY={scaleY}"
     )
@@ -534,6 +573,69 @@ def rescale_dataset(
     )
     return rescaled_dataset
 
+@cache
+def get_point_geometry(
+    x: int,
+    y: int,
+    scaleX: int = 16,
+    scaleY: int = 16,
+)->List[Tuple[float, float]]:
+    """
+    Get the unprojected square geometry for a point at the specified x, y indices in the rescaled dataset.
+    Args:
+        x (int): The x index of the point.
+        y (int): The y index of the point.
+        scaleX (int): The number of x points to collapse into one.
+        scaleY (int): The number of y points to collapse into one.
+    Returns:
+        List[Tuple[float, float]]: A list of tuples representing the coordinates of the square geometry.
+    """
+    _, x_coords, y_coords = get_example_dataset_precip(scaleX=scaleX, scaleY=scaleY)
+    # For now, let's just assume the dataset will always be in 1000x1000 squares at scale 1,
+    # and that the x and y coordinates are evenly spaced.
+    # From there, we can quickly assume the coordinates of the square geometry.
+    centerX = x_coords[x]
+    centerY = y_coords[y]
+    baseWidth = 1000
+    xWidth = baseWidth * scaleX
+    yWidth = baseWidth * scaleY
+    # Calculate the coordinates of the square geometry
+    geometry = [
+        (centerX - xWidth / 2, centerY - yWidth / 2),  # Bottom-left
+        (centerX + xWidth / 2, centerY - yWidth / 2),  # Bottom-right
+        (centerX + xWidth / 2, centerY + yWidth / 2),  # Top-right
+        (centerX - xWidth / 2, centerY + yWidth / 2),  # Top-left
+    ]
+    # Return the geometry as a list of tuples
+    return geometry
+
+def uncached_get_point_geometry(
+    x: int,
+    y: int,
+    scaleX: int = 16,
+    scaleY: int = 16,
+)->List[Tuple[float, float]]:
+    """
+    Uncached version of get_point_geometry for testing purposes.
+    """
+    _, x_coords, y_coords = get_example_dataset_precip(scaleX=scaleX, scaleY=scaleY)
+    # For now, let's just assume the dataset will always be in 1000x1000 squares at scale 1,
+    # and that the x and y coordinates are evenly spaced.
+    # From there, we can quickly assume the coordinates of the square geometry.
+    centerX = x_coords[x]
+    centerY = y_coords[y]
+    baseWidth = 1000
+    xWidth = baseWidth * scaleX
+    yWidth = baseWidth * scaleY
+    # Calculate the coordinates of the square geometry
+    geometry = [
+        (centerX - xWidth / 2, centerY - yWidth / 2),  # Bottom-left
+        (centerX + xWidth / 2, centerY - yWidth / 2),  # Bottom-right
+        (centerX + xWidth / 2, centerY + yWidth / 2),  # Top-right
+        (centerX - xWidth / 2, centerY + yWidth / 2),  # Top-left
+    ]
+    # Return the geometry as a list of tuples
+    return geometry
 
 if __name__ == "__main__":
     import time
@@ -573,7 +675,7 @@ if __name__ == "__main__":
                 pickle.dump(datasets, f)
             print("Cached datasets to ./dist/forecasted_forcings_cache.pkl")
 
-    rescale_test = True
+    rescale_test = False
     if rescale_test:
         # Test rescaling the dataset
         example_dataset = get_example_dataset()
@@ -883,3 +985,62 @@ if __name__ == "__main__":
         # print(f"Merged dataset created in {t3 - t2:.2f} seconds")
         # print(merged_dataset)  # Print the merged dataset for verification
         # print(f"Total time taken: {t3 - t0:.2f} seconds")
+
+    test_geometry = True
+    if test_geometry:
+        scaleX = 16
+        scaleY = 16
+        example_dataset0 = get_example_dataset_rescaled(scaleX=scaleX, scaleY=scaleY)
+        # Need to time how long it takes to generate the geometry for a point
+        t0 = time.perf_counter()
+        num_points_to_test = 100
+        geometries = []
+        for i in range(num_points_to_test):
+            geom = get_point_geometry(x=i, y=i, scaleX=scaleX, scaleY=scaleY)
+            geometries.append(geom)
+        t1 = time.perf_counter()
+        print(
+            f"Generated {num_points_to_test} point geometries in {t1 - t0:.2f} seconds, average {((t1 - t0) / num_points_to_test)*1000:.2f} ms per geometry."
+        )
+        total_points = example_dataset0.RAINRATE.shape[1] * example_dataset0.RAINRATE.shape[2]
+        print(
+            f"Total points in the dataset: {total_points}, estimated time to generate all geometries: {(t1 - t0) / num_points_to_test * total_points / 60:.2f} minutes."
+        )
+        def estimate_geom_method(method_name: str, method: Callable) -> Tuple[float, float]:
+            """Test a point geometry method and estimate time to run on full dataset."""
+            t0 = time.perf_counter()
+            num_points_to_test = 100
+            geometries = []
+            xpoints_to_test = np.random.randint(0, example_dataset0.RAINRATE.shape[2], num_points_to_test)
+            ypoints_to_test = np.random.randint(0, example_dataset0.RAINRATE.shape[1], num_points_to_test)
+            for i in range(num_points_to_test):
+                # geom = method(x=i, y=i, scaleX=scaleX, scaleY=scaleY)
+                geom = method(x=xpoints_to_test[i], y=ypoints_to_test[i], scaleX=scaleX, scaleY=scaleY)
+                geometries.append(geom)
+            t1 = time.perf_counter()
+            total_points = example_dataset0.RAINRATE.shape[1] * example_dataset0.RAINRATE.shape[2]
+            estimated_total_time = (t1 - t0) / num_points_to_test * total_points
+            return (t1 - t0) / num_points_to_test, estimated_total_time / 60
+        avg_time, est_total_time = estimate_geom_method("get_point_geometry", get_point_geometry)
+        print(
+            f"get_point_geometry: average {avg_time*1000:.2f} ms per geometry, estimated time to generate all geometries: {est_total_time:.2f} minutes."
+        )
+        avg_time, est_total_time = estimate_geom_method("uncached_get_point_geometry", uncached_get_point_geometry)
+        print(
+            f"uncached_get_point_geometry: average {avg_time*1000:.2f} ms per geometry, estimated time to generate all geometries: {est_total_time:.2f} minutes."
+        )
+        # Something strange is happening. It's zero both times.
+        # Let's try actually running the full dataset.
+        all_geometries = []
+        t2 = time.perf_counter()
+        for y in range(example_dataset0.RAINRATE.shape[1]):
+            for x in range(example_dataset0.RAINRATE.shape[2]):
+                geom = get_point_geometry(x=x, y=y, scaleX=scaleX, scaleY=scaleY)
+                all_geometries.append(geom)
+        t3 = time.perf_counter()
+        print(
+            f"Generated all {len(all_geometries)} point geometries in {t3 - t2:.2f} seconds, average {((t3 - t2) / len(all_geometries))*1000:.2f} ms per geometry."
+        )
+        print(
+            f"First few geometries: {all_geometries[:3]}"
+        )

@@ -10,30 +10,6 @@ var colorDict = {
   clearFill: getComputedStyle(document.documentElement).getPropertyValue('--clear-fill')
 };
 
-// // A function that creates a cli command from the interface
-// function create_cli_command() {
-//   const cliPrefix = document.getElementById("cli-prefix");
-//   cliPrefix.style.opacity = 1;
-//   var selected_basins = $("#selected-basins").text();
-//   var start_time = document.getElementById("start-time").value.split("T")[0];
-//   var end_time = document.getElementById("end-time").value.split("T")[0];
-//   var command = `-i ${selected_basins} --subset --start ${start_time} --end ${end_time} --forcings --realization --run`;
-//   var command_all = `-i ${selected_basins} --start ${start_time} --end ${end_time} --all`;
-//   if (selected_basins != "None - get clicking!") {
-//     $("#cli-command").text(command);
-//   }
-// }
-
-// function updateCommandPrefix() {
-//   const toggleInput = document.getElementById("runcmd-toggle");
-//   const cliPrefix = document.getElementById("cli-prefix");
-//   const uvxText = "uvx --from ngiab_data_preprocess cli";
-//   const pythonText = "python -m ngiab_data_cli";
-//   // Set initial handle text based on the default state using data attribute
-//   cliPrefix.textContent = toggleInput.checked ? pythonText : uvxText;
-// }
-// document.getElementById("runcmd-toggle").addEventListener('change', updateCommandPrefix);
-
 // // These functions are exported by data_processing.js
 // document.getElementById('map').addEventListener('click', create_cli_command);
 // document.getElementById('start-time').addEventListener('change', create_cli_command);
@@ -149,10 +125,10 @@ function update_map(cat_id, e) {
       }
     });
 }
-map.on('click', 'catchments', (e) => {
-  cat_id = e.features[0].properties.divide_id;
-  update_map(cat_id, e);
-});
+// map.on('click', 'catchments', (e) => {
+//   cat_id = e.features[0].properties.divide_id;
+//   update_map(cat_id, e);
+// });
 
 // Create a popup, but don't add it to the map yet.
 const popup = new maplibregl.Popup({
@@ -508,40 +484,15 @@ function updateForecastLayer(data) {
     data = JSON.parse(data); // Ensure data is parsed correctly
   }
   receivedData = data;
-  // // Data is an object of precipitation values keyed by a composite string of "x,y"
-  // const minValue = Math.min(...Object.values(data));
-  // const maxValue = Math.max(...Object.values(data));
-  // const color = (value) => {
-  //   // Map the value to a color based on a gradient
-  //   const ratio = (value - minValue) / (maxValue - minValue);
-  //   const r = Math.floor(255 * (1 - ratio));
-  //   const g = Math.floor(255 * ratio);
-  //   return `rgba(${r}, ${g}, 0, 1)`; // Green to red gradient
-  // }
-  // const features = Object.entries(data).map(([key, value]) => {
-  //   const [x, y] = key.split(',').map(Number);
-  //   return {
-  //     type: "Feature",
-  //     geometry: {
-  //       type: "Point",
-  //       coordinates: [x, y]
-  //     },
-  //     properties: {
-  //       color: color(value),
-  //       value: value
-  //     }
-  //   };
-  // });
-  // // Update the source data
-  // map.getSource("forecasted_precip").setData({
-  //   type: "FeatureCollection",
-  //   features: features
-  // });
-  // Data is an object that contains a 2D list of points and a 2D list of values
-  const points = data["points"];
+  // // Data is an object that contains a 2D list of points and a 2D list of values
+  // const points = data["points"];
+  // Swapped the 2D list of points and values for 1D lists of geometries and their values
+  const geoms = data["geometries"];
   const values = data["values"];
-  const minValue = Math.min(...values.flat());
-  const maxValue = Math.max(...values.flat());
+  // const minValue = Math.min(...values.flat());
+  // const maxValue = Math.max(...values.flat());
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
   const color = (value) => {
     if (value === minValue || Math.abs(value - minValue) < 1e-6) {
       return "rgba(0, 0, 0, 0)"; // Transparent
@@ -555,30 +506,59 @@ function updateForecastLayer(data) {
   }
   // For each point, create a polygon feature using the neighboring points
   var features = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    for (let j = 0; j < points[i].length - 1; j++) {
-      const curPos = points[i][j];
-      const nextPosX = points[i][j + 1];
-      const nextPosY = points[i + 1][j];
-      const nextPosXY = points[i + 1][j + 1];
-      const value = values[i][j];
-      features.push({
-        type: "Feature",
-        geometry: {
-          type: "Polygon",
-          coordinates: [[
-            [curPos[0], curPos[1]],
-            [nextPosX[0], nextPosX[1]],
-            [nextPosXY[0], nextPosXY[1]],
-            [nextPosY[0], nextPosY[1]],
-          ]]
-        },
-        properties: {
-          color: color(value),
-          value: value 
-        }
-      });
+  // for (let i = 0; i < points.length - 1; i++) {
+  //   for (let j = 0; j < points[i].length - 1; j++) {
+  //     const curPos = points[i][j];
+  //     const nextPosX = points[i][j + 1];
+  //     const nextPosY = points[i + 1][j];
+  //     const nextPosXY = points[i + 1][j + 1];
+  //     const value = values[i][j];
+  //     features.push({
+  //       type: "Feature",
+  //       geometry: {
+  //         type: "Polygon",
+  //         coordinates: [[
+  //           [curPos[0], curPos[1]],
+  //           [nextPosX[0], nextPosX[1]],
+  //           [nextPosXY[0], nextPosXY[1]],
+  //           [nextPosY[0], nextPosY[1]],
+  //         ]]
+  //       },
+  //       properties: {
+  //         color: color(value),
+  //         value: value 
+  //       }
+  //     });
+  //   }
+  // }
+  for (let i = 0; i < geoms.length; i++) {
+    const geom = geoms[i];
+    const value = values[i];
+    // The geometry is a list of four points that form a rectangle
+    if (geom.length < 4) {
+      console.warn('Geometry has less than 4 points, skipping:', geom);
+      continue; // Skip geometries that don't have enough points
     }
+    const centerX = (geom[0][0] + geom[2][0]) / 2;
+    const centerY = (geom[0][1] + geom[2][1]) / 2;
+    features.push({
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [[
+          [geom[0][0], geom[0][1]],
+          [geom[1][0], geom[1][1]],
+          [geom[2][0], geom[2][1]],
+          [geom[3][0], geom[3][1]],
+          [geom[0][0], geom[0][1]], // Close the polygon
+        ]]
+      },
+      properties: {
+        color: color(value),
+        value: value,
+        center: [centerX, centerY] // Add center point for popup
+      }
+    });
   }
   // Update the source data
   map.getSource("forecasted_precip").setData({
@@ -588,6 +568,22 @@ function updateForecastLayer(data) {
   console.log('Forecasted precipitation overlay updated with data:', data);
 
 }
+
+// Set up geometry popups for RAINRATE values
+map.on("click", "forecasted_precip_layer", (e) => {
+  const value = e.features[0].properties.value;
+  const coordinates = e.features[0].geometry.coordinates[0][0];
+  // Use the center point for the popup
+  const center = JSON.parse(e.features[0].properties.center);
+
+  // Create a popup at the center of the polygon with the value
+  new maplibregl.Popup()
+    .setLngLat(center)
+    .setHTML(`RAINRATE: ${value} kg/m^2/s`)
+    .addTo(map);
+  console.log('Clicked on forecasted precipitation layer at', coordinates, 'with value', value);
+});
+
 
 // Accessing forecasted forcing data
 

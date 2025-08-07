@@ -18,9 +18,12 @@ from forecasting_data.forecast_datasets import (
     get_forecasting_gridlines_vert_projected,
     rescale_dataset,
     reproject_points,
+    get_point_geometry,
+    reproject_points_2d,
 )
 
 from time import perf_counter
+from numpy import isclose, isnan
 
 main = Blueprint("main", __name__)
 intra_module_db = {}
@@ -206,23 +209,93 @@ def get_forecast_precip():
         # Precip data is now a 2D numpy array with shape (x, y)
         after_helper_access = perf_counter()
         print(f"Accessing precip data took {after_helper_access - before_access:.2f} seconds")
+        
+        # Lambda function for whether to skip a value
+        # we want to skip values that are NaN or excessively close to zero
+        skip_value = lambda v: isnan(v) or isclose(v, 0.0, atol=1e-6)
+        
         # # Now we can iterate over the numpy array and create the data_dict
-        points = []
+        # points = []
+        # values = []
+        # for y in range(precip_data_np.shape[0]):
+        #     row = []
+        #     rowvals = []
+        #     for x in range(precip_data_np.shape[1]):
+        #         value = precip_data_np[y, x]
+        #         row.append((x_coords[x], y_coords[y]))  # (x, y) coordinates
+        #         rowvals.append(value)
+        #     points.append(row)
+        #     values.append(rowvals)
+        geoms = []
         values = []
+        start_points_creation = perf_counter()
+        last_printed_point = start_points_creation
+        total_points = precip_data_np.shape[0] * precip_data_np.shape[1]
+        points_created = 0
+        print_interval = 10  # seconds
         for y in range(precip_data_np.shape[0]):
-            row = []
-            rowvals = []
             for x in range(precip_data_np.shape[1]):
+                if perf_counter() - last_printed_point > print_interval:
+                    percent_complete = (points_created / total_points) * 100
+                    print(
+                        f"Point creation {percent_complete:.2f}% complete ({points_created}/{total_points})"
+                    )
+                    last_printed_point = perf_counter()
+                points_created += 1
                 value = precip_data_np[y, x]
-                row.append((x_coords[x], y_coords[y]))  # (x, y) coordinates
-                rowvals.append(value)
-            points.append(row)
-            values.append(rowvals)
+                if skip_value(value):
+                    continue
+                # Get the geometry for the point
+                geom = get_point_geometry(
+                    x, y, scaleX=scaleX, scaleY=scaleY
+                )
+                geoms.append(geom)
+                values.append(value)
+        after_points_creation = perf_counter()
+        print(f"Creating points took {after_points_creation - after_helper_access:.2f} seconds")
         # Reproject points to the desired projection
         # reprojected_points = reproject_points(dataset, points)
-        reprojected_points = [reproject_points(dataset, row) for row in points]
+        # reprojected_points = [reproject_points(dataset, row) for row in points]
+        # reprojected_geoms = [
+        #     reproject_points(dataset, geom) for geom in geoms
+        # ]
+        # Reprojection seems excessively slow... Need to manually evaluate with for loop
+        # reprojected_geoms = []
+        # start_reprojection = perf_counter()
+        # last_printed_geom = start_reprojection
+        # total_geoms = len(geoms)
+        # geoms_reprojected = 0
+        # for geom in geoms:
+        #     if perf_counter() - last_printed_geom > print_interval:
+        #         percent_complete = (geoms_reprojected / total_geoms) * 100
+        #         print(
+        #             f"Reprojecting geometries {percent_complete:.2f}% complete ({geoms_reprojected}/{total_geoms})"
+        #         )
+        #         if geoms_reprojected > 1:
+        #             # expected_time = (
+        #             #     (after_reprojection - start_reprojection)
+        #             #     / geoms_reprojected
+        #             # ) * (total_geoms - geoms_reprojected)
+        #             rate = (perf_counter() - start_reprojection) / geoms_reprojected
+        #             expected_time = rate * (total_geoms - geoms_reprojected)
+        #             print(
+        #                 f"Expected time to complete reprojection: {expected_time:.2f} seconds"
+        #             )
+        #         last_printed_geom = perf_counter()
+        #     geoms_reprojected += 1
+        #     reprojected_geom = reproject_points(dataset, geom)
+        #     reprojected_geoms.append(reprojected_geom)
+        reprojected_geoms = reproject_points_2d(
+            dataset, geoms
+        )  # Reproject all geometries at once
+        after_reprojection = perf_counter()
+        print(f"Reprojecting points took {after_reprojection - after_points_creation:.2f} seconds")
         # Now we can create the data_dict with reprojected points and values
-        data_dict = {"points": reprojected_points, "values": values}
+        # data_dict = {"points": reprojected_points, "values": values}
+        data_dict = {
+            "geometries": reprojected_geoms,
+            "values": values,
+        }
         intra_module_db["forecasted_forcing_data_dict"] = data_dict
         # print(f"Data dict created with {len(data_dict)} entries. Converting to JSON.")
         # data_dict["precip_data"] = precip_data_np.tolist()  # Convert to list for JSON serialization
