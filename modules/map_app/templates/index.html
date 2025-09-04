@@ -32,12 +32,20 @@
             <button id="toggle-panel-button" aria-label="Toggle Options Panel">☰</button>
             <div id="options-panel" class="minimized">
                 <div id="options-content">
-                    <button id="toggle-button-gages">Show gages</button>
-                    <button id="toggle-button-camels">Show CAMELS basins</button>
-                    <button id="toggle-button-nwm">Overlay NWM chunks</button>
-                    <button id="toggle-button-aorc">Overlay AORC chunks</button>
-                    <button id="toggle-button-forecast">Show Forecast Data</button>
+                    <div id="toggle-options">
+                        <button id="toggle-button-gages">Show gages</button>
+                        <button id="toggle-button-camels">Show CAMELS basins</button>
+                        <button id="toggle-button-nwm">Overlay NWM chunks</button>
+                        <button id="toggle-button-aorc">Overlay AORC chunks</button>
+                        <button id="toggle-button-forecast">Show Forecast Data</button>
+                    </div>
+                    <div id="region-selection">
+                        <!-- Use sliders to select specific region of map for data access -->
+                        <div id="region-col-selection"></div>
+                        <div id="region-row-selection"></div>
+                    </div>
                 </div>
+
             </div>
             <script>
                 document.getElementById('toggle-panel-button').addEventListener('click', function () {
@@ -48,36 +56,7 @@
                 });
             </script>
             <div id="map"></div>
-
-            <!-- <div class="command-container">
-                <div class="command-header">
-                        <div class="toggle-switch">
-                            <input type="checkbox" id="runcmd-toggle" class="toggle-input">
-                            <label for="runcmd-toggle" class="toggle-label">
-                                <span class="toggle-text toggle-text-left">UVX</span>
-                                <span class="toggle-text toggle-text-right">Pip</span>
-                                <span class="toggle-handle"></span>
-                    <span>Command</span>
-                    <button id="copy-to-clip" class="copy-button" aria-label="Copy to clipboard">
-                </div>
-                <div id="command-builder">
-            </div> -->
-            <!-- <script>
-                document.getElementById('copy-to-clip').addEventListener('click', async function() {
-            </script> -->
-            <!-- <h2>For selection by gage id please use the cli.</h2> -->
         </section>
-        <!-- <section id="basins-container">
-            <h2>Selected Basins</h2>
-            <div id="selected-basins">None - get clicking!</div>
-            <button id="subset-button">Create subset gpkg</button>
-            <img class="loading" src="{{ url_for('static', filename='resources/loading.gif') }}" alt="Loading"
-                id="subset-loading">
-            <div id="output-info">
-                <strong>Output folder is configured in the ~/.ngiab/preprocessor file</strong>
-            </div>
-            <div id="output-path"></div>
-        </section> -->
         <section id="scale-settings">
             <!-- 
             Controls for modifying the granularity of the displayed data
@@ -148,7 +127,8 @@
         <section id="time-settings">
             <div class="time-input">
                 <label for="target-time">Target Time:</label>
-                <input type="datetime-local" id="target-time" name="target-time" value="2018-09-17T00:00" min="2018-09-17T00:00">
+                <input type="datetime-local" id="target-time" name="target-time" value="2018-09-17T00:00"
+                    min="2018-09-17T00:00">
             </div>
             <div class="lead-time-input">
                 <label for="lead-time">Lead Time (hours):</label>
@@ -193,7 +173,9 @@
     <script src="{{ url_for('static', filename='js/console.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/data_processing.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js' ) }}"></script>
-
+    <script src="{{ url_for('static', filename='js/map_configs/basic_layers.js' ) }}"></script>
+    <script src="{{ url_for('static', filename='js/map_configs/forecast_layers.js' ) }}"></script>
+    <script src="{{ url_for('static', filename='js/map_configs/layer_toggles.js' ) }}"></script>
 </body>
 
 </html>

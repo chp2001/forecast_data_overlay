@@ -124,18 +124,6 @@ h2 {
   box-shadow: var(--shadow-md);
 }
 
-#selected-basins,
-#cli-command,#cli-prefix {
-  background: var(--code-bg);
-  padding: 16px;
-  border-radius: var(--border-radius);
-  margin: 16px 0;
-  font-family: 'Monaco', 'Consolas', monospace;
-  font-size: 0.9rem;
-  color: var(--text-color);
-}
-
-
 button {
   background-color: var(--primary-color);
   color: light-dark(white, #f1f5f9);
