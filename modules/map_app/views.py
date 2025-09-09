@@ -22,6 +22,7 @@ from forecasting_data.forcing_datasets import (
     get_conus_forcing_gridlines_horiz_projected,
     get_conus_forcing_gridlines_vert_projected,
     get_point_geometry,
+    load_forecasted_forcing_with_options,
 )
 
 from time import perf_counter
@@ -162,176 +163,295 @@ def set_scales():
     return jsonify({"message": "Scales set successfully"}), 200
 
 
+@main.route("/set_region_bounds", methods=["POST"])
+def set_region_bounds():
+    """Set the region bounds for the forecasted forcing dataset."""
+    data = json.loads(request.data.decode("utf-8"))
+    logger.info(f"Setting region bounds with data: {data}")
+    rowMin = data.get("rowMin")
+    rowMax = data.get("rowMax")
+    colMin = data.get("colMin")
+    colMax = data.get("colMax")
+    missing = []
+    if rowMin is None:
+        missing.append("rowMin")
+    if rowMax is None:
+        missing.append("rowMax")
+    if colMin is None:
+        missing.append("colMin")
+    if colMax is None:
+        missing.append("colMax")
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+    intra_module_db["rowMin"] = int(rowMin)
+    intra_module_db["rowMax"] = int(rowMax)
+    intra_module_db["colMin"] = int(colMin)
+    intra_module_db["colMax"] = int(colMax)
+    logger.info(f"Region bounds set to rows {rowMin}-{rowMax} and cols {colMin}-{colMax}")
+    return jsonify({"message": "Region bounds set successfully"}), 200
+
+
 import traceback
 
+use_old_forecast_precip_method = False
+if use_old_forecast_precip_method:
 
-@main.route("/get_forecast_precip", methods=["GET"])
-def get_forecast_precip():
-    """Get the forecast precipitation for the selected arguments."""
-    start_command = perf_counter()
-    selected_time = intra_module_db.get("selected_time")
-    forecast_cycle = intra_module_db.get("forecast_cycle")
-    lead_time = intra_module_db.get("lead_time")
-    scaleX = intra_module_db.get("scaleX", 16)
-    scaleY = intra_module_db.get("scaleY", 16)
+    @main.route("/get_forecast_precip", methods=["GET"])
+    def get_forecast_precip():
+        """Get the forecast precipitation for the selected arguments."""
+        start_command = perf_counter()
+        selected_time = intra_module_db.get("selected_time")
+        forecast_cycle = intra_module_db.get("forecast_cycle")
+        lead_time = intra_module_db.get("lead_time")
+        scaleX = intra_module_db.get("scaleX", 16)
+        scaleY = intra_module_db.get("scaleY", 16)
+        rowMin = intra_module_db.get("rowMin", 0) // scaleY
+        rowMax = intra_module_db.get("rowMax", 0) // scaleY
+        print(f"rowMin: {rowMin}, rowMax: {rowMax}, scaleY: {scaleY}")
+        rowRange = None if rowMin == rowMax else range(rowMin, rowMax)
+        colMin = intra_module_db.get("colMin", 0) // scaleX
+        colMax = intra_module_db.get("colMax", 0) // scaleX
+        print(f"colMin: {colMin}, colMax: {colMax}, scaleX: {scaleX}")
+        colRange = None if colMin == colMax else range(colMin, colMax)
 
-    if not selected_time or not forecast_cycle or not lead_time:
-        return jsonify({"error": "Forecast arguments not set"}), 400
+        if not selected_time or not forecast_cycle or not lead_time:
+            return jsonify({"error": "Forecast arguments not set"}), 400
 
-    forecast_cycle = int(forecast_cycle)
-    lead_time = int(lead_time)
+        forecast_cycle = int(forecast_cycle)
+        lead_time = int(lead_time)
 
-    try:
-        print(
-            f"Loading forecasted forcing for {selected_time} [{type(selected_time)}], "
-            f"cycle {forecast_cycle} [{type(forecast_cycle)}], lead time {lead_time} [{type(lead_time)}]"
+        try:
+            print(
+                f"Loading forecasted forcing for {selected_time} [{type(selected_time)}], "
+                f"cycle {forecast_cycle} [{type(forecast_cycle)}], lead time {lead_time} [{type(lead_time)}]"
+            )
+            dataset = load_forecasted_forcing(
+                date=selected_time, fcst_cycle=forecast_cycle, lead_time=lead_time
+            )
+            intra_module_db["forecasted_forcing_dataset"] = dataset
+
+            rescaled_dataset = rescale_precip_dataset(dataset, scaleX, scaleY)
+            intra_module_db["rescaled_forecasted_forcing_dataset"] = rescaled_dataset
+            # precip_data = dataset["RAINRATE"]
+            data_dict = {}
+            # Accessing the data points individually is ridiculously slow,
+            # so we will instead convert to numpy before accessing by using a relevant helper function
+            before_access = perf_counter()
+            # precip_data_np, x_coords, y_coords = get_dataset_precip(dataset)
+            precip_data_np, x_coords, y_coords = get_dataset_precip(
+                rescaled_dataset
+            )  # Use the rescaled dataset
+            # Precip data is now a 2D numpy array with shape (x, y)
+            after_helper_access = perf_counter()
+            print(f"Accessing precip data took {after_helper_access - before_access:.2f} seconds")
+
+            # Lambda function for whether to skip a value
+            # we want to skip values that are NaN or excessively close to zero
+            skip_value = lambda v: isnan(v) or isclose(v, 0.0, atol=1e-6)
+            geoms = []
+            values = []
+            start_points_creation = perf_counter()
+            last_printed_point = start_points_creation
+            total_points = precip_data_np.shape[0] * precip_data_np.shape[1]
+            points_created = 0
+            print_interval = 10  # seconds
+            yRange = range(precip_data_np.shape[0]) if rowRange is None else rowRange
+            xRange = range(precip_data_np.shape[1]) if colRange is None else colRange
+            # for y in range(precip_data_np.shape[0]):
+            #     for x in range(precip_data_np.shape[1]):
+            for y in yRange:
+                for x in xRange:
+                    if perf_counter() - last_printed_point > print_interval:
+                        percent_complete = (points_created / total_points) * 100
+                        print(
+                            f"Point creation {percent_complete:.2f}% complete ({points_created}/{total_points})"
+                        )
+                        last_printed_point = perf_counter()
+                    points_created += 1
+                    value = precip_data_np[y, x]
+                    if skip_value(value):
+                        continue
+                    # Get the geometry for the point
+                    geom = get_point_geometry(x, y, scaleX=scaleX, scaleY=scaleY)
+                    geoms.append(geom)
+                    values.append(value)
+            after_points_creation = perf_counter()
+            print(f"Creating points took {after_points_creation - after_helper_access:.2f} seconds")
+            # Reproject points to the desired projection
+            reprojected_geoms = reproject_points_2d(
+                dataset, geoms
+            )  # Reproject all geometries at once
+            after_reprojection = perf_counter()
+            print(
+                f"Reprojecting points took {after_reprojection - after_points_creation:.2f} seconds"
+            )
+            # Now we can create the data_dict with reprojected points and values
+            # data_dict = {"points": reprojected_points, "values": values}
+            data_dict = {
+                "geometries": reprojected_geoms,
+                "values": values,
+            }
+            intra_module_db["forecasted_forcing_data_dict"] = data_dict
+            # print(f"Data dict created with {len(data_dict)} entries. Converting to JSON.")
+            # data_dict["precip_data"] = precip_data_np.tolist()  # Convert to list for JSON serialization
+            # data_dict["x_coords"] = x_coords.tolist()  # Convert to list for JSON serialization
+            # data_dict["y_coords"] = y_coords.tolist()  # Convert to list for JSON serialization
+            after_data_dict_creation = perf_counter()
+            print(
+                f"Creating data_dict took {after_data_dict_creation - after_helper_access:.2f} seconds"
+            )
+            # Convert the data_dict to JSON
+            data_json = json.dumps(data_dict, default=str)
+            after_json_conversion = perf_counter()
+            print(
+                f"JSON conversion took {after_json_conversion - after_data_dict_creation:.2f} seconds"
+            )
+            print(f"Data JSON created with length {len(data_json)}")
+            logger.info(
+                (
+                    f"Forecasted precipitation data loaded successfully in {after_json_conversion - start_command:.2f} seconds for {selected_time} ; {forecast_cycle} ; {lead_time}"
+                )
+            )
+            return jsonify(data_json), 200
+        except Exception as e:
+            print("Error loading forecasted forcing")
+            print(str(e))
+            print(traceback.format_exc())
+            logger.error(
+                (
+                    f"Error loading forecasted forcing"
+                    f" in {perf_counter() - start_command:.2f} seconds: "
+                    f"{str(e)}"
+                )
+            )
+            return jsonify({"error": str(e)}), 500
+else:
+
+    @main.route("/get_forecast_precip", methods=["POST"])
+    def get_forecast_precip():
+        """Get the forecast precipitation for the selected arguments."""
+        t0 = perf_counter()
+        # First, check for options sent in the request
+        request_data = {}
+        if request.data:
+            request_data = json.loads(request.data.decode("utf-8"))
+        # Also, try to enforce standardized keys on the intra_module_db and request_data
+        selected_time = request_data.get("selected_time") or intra_module_db.get("selected_time")
+        forecast_cycle = request_data.get("forecast_cycle") or intra_module_db.get("forecast_cycle")
+        lead_time = request_data.get("lead_time") or intra_module_db.get("lead_time")
+        scaleX = request_data.get("scaleX") or intra_module_db.get("scaleX", 16)
+        scaleY = request_data.get("scaleY") or intra_module_db.get("scaleY", 16)
+        rowMin = request_data.get("rowMin") or intra_module_db.get("rowMin", None)
+        rowMax = request_data.get("rowMax") or intra_module_db.get("rowMax", None)
+        colMin = request_data.get("colMin") or intra_module_db.get("colMin", None)
+        colMax = request_data.get("colMax") or intra_module_db.get("colMax", None)
+        intable_args = {  # Reformat for use in `load_forecasted_forcing_with_options`
+            "fcst_cycle": forecast_cycle,
+            "lead_time": lead_time,
+            "scaleX": scaleX,
+            "scaleY": scaleY,
+            "rowMin": rowMin,
+            "rowMax": rowMax,
+            "colMin": colMin,
+            "colMax": colMax,
+        }
+        t1 = perf_counter()  # After reading request data / intra_module_db
+        violations = []
+        if not selected_time or not forecast_cycle or not lead_time:
+            # return jsonify({"error": "Forecast arguments not set"}), 400
+            violation = "Forecast arguments not set (missing: "
+            missing = [
+                name
+                for name, val in [
+                    ("selected_time", selected_time),
+                    ("forecast_cycle", forecast_cycle),
+                    ("lead_time", lead_time),
+                ]
+                if not val
+            ]
+            violation += ", ".join(missing) + ")"
+            violations.append(violation)
+        if any(v is not None for v in [rowMin, rowMax, colMin, colMax]) and not all(
+            v is not None for v in [rowMin, rowMax, colMin, colMax]
+        ):
+            # return jsonify(
+            #     {
+            #         "error": f"Missing required fields for region bounds: "
+            #         f"{', '.join([k for k, v in [('rowMin', rowMin), ('rowMax', rowMax), ('colMin', colMin), ('colMax', colMax)] if v is None])}"
+            #     }
+            # ), 400
+            violation = "Missing required fields for region bounds: "
+            missing = [
+                name
+                for name, val in [
+                    ("rowMin", rowMin),
+                    ("rowMax", rowMax),
+                    ("colMin", colMin),
+                    ("colMax", colMax),
+                ]
+                if val is None
+            ]
+            violation += ", ".join(missing)
+            violations.append(violation)
+        elif all(v is not None for v in [rowMin, rowMax, colMin, colMax]):
+            if rowMin >= rowMax:
+                violations.append(f"rowMin ({rowMin}) must be less than rowMax ({rowMax})")
+            if colMin >= colMax:
+                violations.append(f"colMin ({colMin}) must be less than colMax ({colMax})")
+        if violations:
+            return jsonify({"error": " ; ".join(violations)}), 400
+        t2 = perf_counter()  # After validation
+        intable_args = {k: int(v) if v is not None else None for k, v in intable_args.items()}
+
+        precip_data_array, transformer = load_forecasted_forcing_with_options(
+            date=selected_time,
+            **intable_args,
         )
-        dataset = load_forecasted_forcing(
-            date=selected_time, fcst_cycle=forecast_cycle, lead_time=lead_time
-        )
-        intra_module_db["forecasted_forcing_dataset"] = dataset
 
-        rescaled_dataset = rescale_precip_dataset(dataset, scaleX, scaleY)
-        intra_module_db["rescaled_forecasted_forcing_dataset"] = rescaled_dataset
-        # precip_data = dataset["RAINRATE"]
-        data_dict = {}
-        # # Dataset is a 3d array with dimensions (time, x, y)
-        # # The requested data contains only the first time step
-        # # Ideally we store the data in the dict with `"{x},{y}": value` pairs
-        # print(f"Grabbing values from precip_data with shape {precip_data.shape}")
-        # for x in range(precip_data.shape[1]):
-        #     for y in range(precip_data.shape[2]):
-        #         value = precip_data[0, x, y].values.item()  # Get the value as a float
-        #         data_dict[f"{x},{y}"] = value
-        # print(f"Data dict created with {len(data_dict)} entries. Converting to JSON.")
-
-        # Accessing the data points individually is ridiculously slow,
-        # so we will instead convert to numpy before accessing by using a relevant helper function
-        before_access = perf_counter()
-        # precip_data_np, x_coords, y_coords = get_dataset_precip(dataset)
-        precip_data_np, x_coords, y_coords = get_dataset_precip(
-            rescaled_dataset
-        )  # Use the rescaled dataset
-        # Precip data is now a 2D numpy array with shape (x, y)
-        after_helper_access = perf_counter()
-        print(f"Accessing precip data took {after_helper_access - before_access:.2f} seconds")
-
-        # Lambda function for whether to skip a value
-        # we want to skip values that are NaN or excessively close to zero
-        skip_value = lambda v: isnan(v) or isclose(v, 0.0, atol=1e-6)
-
-        # # Now we can iterate over the numpy array and create the data_dict
-        # points = []
-        # values = []
-        # for y in range(precip_data_np.shape[0]):
-        #     row = []
-        #     rowvals = []
-        #     for x in range(precip_data_np.shape[1]):
-        #         value = precip_data_np[y, x]
-        #         row.append((x_coords[x], y_coords[y]))  # (x, y) coordinates
-        #         rowvals.append(value)
-        #     points.append(row)
-        #     values.append(rowvals)
+        t3 = perf_counter()  # After data loading
+        if precip_data_array is None:
+            return jsonify({"error": "Failed to load forecasted precipitation data"}), 500
+        data_dict = {
+            "geometries": [],
+            "values": [],
+        }
+        # At this stage, time axis is not eliminated, but is very likely to be length 1
         geoms = []
         values = []
-        start_points_creation = perf_counter()
-        last_printed_point = start_points_creation
-        total_points = precip_data_np.shape[0] * precip_data_np.shape[1]
-        points_created = 0
-        print_interval = 10  # seconds
-        for y in range(precip_data_np.shape[0]):
-            for x in range(precip_data_np.shape[1]):
-                if perf_counter() - last_printed_point > print_interval:
-                    percent_complete = (points_created / total_points) * 100
-                    print(
-                        f"Point creation {percent_complete:.2f}% complete ({points_created}/{total_points})"
-                    )
-                    last_printed_point = perf_counter()
-                points_created += 1
-                value = precip_data_np[y, x]
-                if skip_value(value):
-                    continue
-                # Get the geometry for the point
-                geom = get_point_geometry(x, y, scaleX=scaleX, scaleY=scaleY)
-                geoms.append(geom)
-                values.append(value)
-        after_points_creation = perf_counter()
-        print(f"Creating points took {after_points_creation - after_helper_access:.2f} seconds")
-        # Reproject points to the desired projection
-        # reprojected_points = reproject_points(dataset, points)
-        # reprojected_points = [reproject_points(dataset, row) for row in points]
-        # reprojected_geoms = [
-        #     reproject_points(dataset, geom) for geom in geoms
-        # ]
-        # Reprojection seems excessively slow... Need to manually evaluate with for loop
-        # reprojected_geoms = []
-        # start_reprojection = perf_counter()
-        # last_printed_geom = start_reprojection
-        # total_geoms = len(geoms)
-        # geoms_reprojected = 0
-        # for geom in geoms:
-        #     if perf_counter() - last_printed_geom > print_interval:
-        #         percent_complete = (geoms_reprojected / total_geoms) * 100
-        #         print(
-        #             f"Reprojecting geometries {percent_complete:.2f}% complete ({geoms_reprojected}/{total_geoms})"
-        #         )
-        #         if geoms_reprojected > 1:
-        #             # expected_time = (
-        #             #     (after_reprojection - start_reprojection)
-        #             #     / geoms_reprojected
-        #             # ) * (total_geoms - geoms_reprojected)
-        #             rate = (perf_counter() - start_reprojection) / geoms_reprojected
-        #             expected_time = rate * (total_geoms - geoms_reprojected)
-        #             print(
-        #                 f"Expected time to complete reprojection: {expected_time:.2f} seconds"
-        #             )
-        #         last_printed_geom = perf_counter()
-        #     geoms_reprojected += 1
-        #     reprojected_geom = reproject_points(dataset, geom)
-        #     reprojected_geoms.append(reprojected_geom)
-        reprojected_geoms = reproject_points_2d(dataset, geoms)  # Reproject all geometries at once
-        after_reprojection = perf_counter()
-        print(f"Reprojecting points took {after_reprojection - after_points_creation:.2f} seconds")
-        # Now we can create the data_dict with reprojected points and values
-        # data_dict = {"points": reprojected_points, "values": values}
-        data_dict = {
-            "geometries": reprojected_geoms,
-            "values": values,
-        }
+        for t in range(precip_data_array.shape[0]):
+            for y in range(precip_data_array.shape[1]):
+                for x in range(precip_data_array.shape[2]):
+                    value = precip_data_array[t, y, x]
+                    if isnan(value) or isclose(value, 0.0, atol=1e-6):
+                        continue
+                    geom = get_point_geometry(x, y, scaleX=scaleX, scaleY=scaleY)
+                    geoms.append(geom)
+                    values.append(value)
+        reprojected_geoms = reproject_points_2d(transformer, geoms)
+        data_dict["geometries"] = reprojected_geoms
+        data_dict["values"] = values
+        t4 = perf_counter()  # After data processing
+        # Save to intra_module_db for potential session resumption
         intra_module_db["forecasted_forcing_data_dict"] = data_dict
-        # print(f"Data dict created with {len(data_dict)} entries. Converting to JSON.")
-        # data_dict["precip_data"] = precip_data_np.tolist()  # Convert to list for JSON serialization
-        # data_dict["x_coords"] = x_coords.tolist()  # Convert to list for JSON serialization
-        # data_dict["y_coords"] = y_coords.tolist()  # Convert to list for JSON serialization
-        after_data_dict_creation = perf_counter()
-        print(
-            f"Creating data_dict took {after_data_dict_creation - after_helper_access:.2f} seconds"
-        )
-        # Convert the data_dict to JSON
+        intra_module_db["selected_time"] = selected_time
+        intra_module_db["forecast_cycle"] = forecast_cycle
+        intra_module_db["lead_time"] = lead_time
+        intra_module_db["scaleX"] = scaleX
+        intra_module_db["scaleY"] = scaleY
+        intra_module_db["rowMin"] = rowMin
+        intra_module_db["rowMax"] = rowMax
+        intra_module_db["colMin"] = colMin
+        intra_module_db["colMax"] = colMax
+        t5 = perf_counter()  # After saving to intra_module_db
         data_json = json.dumps(data_dict, default=str)
-        after_json_conversion = perf_counter()
-        print(
-            f"JSON conversion took {after_json_conversion - after_data_dict_creation:.2f} seconds"
-        )
-        print(f"Data JSON created with length {len(data_json)}")
+        t6 = perf_counter()  # After JSON conversion
         logger.info(
             (
-                f"Forecasted precipitation data loaded successfully in {after_json_conversion - start_command:.2f} seconds for {selected_time} ; {forecast_cycle} ; {lead_time}"
+                f"Forecasted precipitation data loaded successfully in {t6 - t0:.2f} seconds for {selected_time} ; {forecast_cycle} ; {lead_time} "
+                f"(breakdown: read/validate {t2 - t0:.2f}s, load {t3 - t2:.2f}s, process {t4 - t3:.2f}s, save {t5 - t4:.2f}s, json {t6 - t5:.2f}s)"
             )
         )
         return jsonify(data_json), 200
-    except Exception as e:
-        print("Error loading forecasted forcing")
-        print(str(e))
-        print(traceback.format_exc())
-        logger.error(
-            (
-                f"Error loading forecasted forcing"
-                f" in {perf_counter() - start_command:.2f} seconds: "
-                f"{str(e)}"
-            )
-        )
-        return jsonify({"error": str(e)}), 500
 
 
 @main.route("/get_forecasted_forcing_grid", methods=["GET"])
@@ -350,7 +470,14 @@ def get_forecasted_forcing_grid():
     logger.info(
         f"Forecasting gridlines loaded successfully in {perf_counter() - start_command:.2f} seconds"
     )
-    return jsonify({"horiz_gridlines": horiz_gridlines, "vert_gridlines": vert_gridlines}), 200
+    return jsonify(
+        {
+            "horiz_gridlines": horiz_gridlines,
+            "vert_gridlines": vert_gridlines,
+            "scaleX": scaleX,
+            "scaleY": scaleY,
+        }
+    ), 200
 
 
 @main.route("/tryget_resume_session", methods=["GET"])
@@ -365,9 +492,13 @@ def tryget_resume_session():
             "lead_time": intra_module_db.get("lead_time"),
             "scaleX": intra_module_db.get("scaleX", 16),
             "scaleY": intra_module_db.get("scaleY", 16),
+            "rowMin": intra_module_db.get("rowMin", 0),
+            "rowMax": intra_module_db.get("rowMax", 0),
+            "colMin": intra_module_db.get("colMin", 0),
+            "colMax": intra_module_db.get("colMax", 0),
         }
-        result_dict["forecasted_forcing_data_dict"] = data_json
         logger.info("Resuming session with data: %s", result_dict)
+        result_dict["forecasted_forcing_data_dict"] = data_json
         return jsonify(result_dict), 200
     else:
         return jsonify({"error": "No session data found"}), 404

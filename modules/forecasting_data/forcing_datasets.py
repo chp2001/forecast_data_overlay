@@ -79,6 +79,7 @@ def load_forecasted_forcing(
     runtype: NWMRun = NWMRun.SHORT_RANGE,
     geosource: NWMGeo = NWMGeo.CONUS,
     mem: Optional[NWMMem] = None,
+    quiet: bool = False,
 ) -> xr.Dataset:
     """
     Load a single forecasted forcing dataset for a specified date, forecast cycle, and lead time.
@@ -89,14 +90,16 @@ def load_forecasted_forcing(
         runtype (NWMRun): Type of NWM run (default is NWMRun.SHORT_RANGE).
         geosource (NWMGeo): Geographic source of the data (default is NWMGeo.CONUS).
         mem (Optional[NWMMem]): Memory ensemble member (default is None).
+        quiet (bool): If True, suppresses print statements (default is False).
     Returns:
         xr.Dataset: Loaded xarray Dataset containing the forecasted forcing.
     """
     if not date:
         raise ValueError("Date must be provided.")
-    print(
-        f"Preparing to load forecasted forcing for date: {date}, cycle: {fcst_cycle}, lead time: {lead_time}"
-    )
+    if not quiet:
+        print(
+            f"Preparing to load forecasted forcing for date: {date}, cycle: {fcst_cycle}, lead time: {lead_time}"
+        )
     # Create a file list for the specified date, forecast cycle, and lead time
     file_list = create_default_file_list(
         runinput=runtype,
@@ -113,7 +116,8 @@ def load_forecasted_forcing(
     )
     # Append .json to the file urls
     file_list = append_jsons(file_list)
-    print(f"Loading forecasted forcing from {file_list[0]}")
+    if not quiet:
+        print(f"Loading forecasted forcing from {file_list[0]}")
 
     # Load the dataset from the file list
     datasets = load_datasets(file_list)
@@ -229,6 +233,17 @@ def get_example_forcing_dataset() -> xr.Dataset:
         with open("./dist/example_dataset.pkl", "wb") as f:
             pickle.dump(dataset, f)
         print("Cached example dataset to ./dist/example_dataset.pkl")
+    return dataset
+
+
+def get_example_forcing_dataset_raw(quiet: bool = False) -> xr.Dataset:
+    """
+    Get an example dataset for testing purposes, without any caching.
+
+    Returns:
+        xr.Dataset: An example xarray Dataset.
+    """
+    dataset = load_forecasted_forcing(date="202301010000", fcst_cycle=0, lead_time=1, quiet=quiet)
     return dataset
 
 
@@ -441,6 +456,50 @@ def uncached_get_point_geometry(
     ]
     # Return the geometry as a list of tuples
     return geometry
+
+
+@cache
+def load_forecasted_forcing_with_options(
+    date: str,
+    fcst_cycle: int = 0,
+    lead_time: int = 1,
+    scaleX: Optional[int] = None,
+    scaleY: Optional[int] = None,
+    rowMin: Optional[int] = None,
+    rowMax: Optional[int] = None,
+    colMin: Optional[int] = None,
+    colMax: Optional[int] = None,
+) -> Tuple[xr.DataArray, pyproj.Transformer]:
+    """Use caching to make repeated access to the same data faster by
+    running the calculations previously in `views.py::get_forecast_precip`
+    within a function with hashable arguments.
+
+    Bounding box for clipping is before scaling.
+    Args:
+        date (str): Date in 'YYYYMMDD' format.
+        fcst_cycle (int): Forecast cycle hour (default is 0).
+        lead_time (int): Lead time in hours (default is 1).
+        scaleX (Optional[int]): The number of x points to collapse into one.
+        scaleY (Optional[int]): The number of y points to collapse into one.
+        rowMin (Optional[int]): Minimum row index to slice the data.
+        rowMax (Optional[int]): Maximum row index to slice the data.
+        colMin (Optional[int]): Minimum column index to slice the data.
+        colMax (Optional[int]): Maximum column index to slice the data.
+    Returns:
+        result (Tuple[xr.DataArray, pyproj.Transformer]): A tuple containing:
+            - Precipitation data as an xarray DataArray.
+            - A pyproj Transformer to convert from the dataset's projection to EPSG:4326.
+    """
+    dataset = load_forecasted_forcing(date=date, fcst_cycle=fcst_cycle, lead_time=lead_time)
+    precip_data = dataset["RAINRATE"]
+    if all(v is not None for v in [rowMin, rowMax, colMin, colMax]):
+        precip_data = precip_data[:, rowMin:rowMax, colMin:colMax]
+    if scaleX is not None and scaleY is not None:
+        precip_data = precip_data.coarsen(x=scaleX, y=scaleY, boundary="exact").mean()
+    transformer = pyproj.Transformer.from_crs(
+        get_precip_projection(dataset), "EPSG:4326", always_xy=True
+    )
+    return precip_data, transformer
 
 
 if __name__ == "__main__":
@@ -867,3 +926,239 @@ if __name__ == "__main__":
             f"Generated all {len(all_geometries)} point geometries in {t3 - t2:.2f} seconds, average {((t3 - t2) / len(all_geometries)) * 1000:.2f} ms per geometry."
         )
         print(f"First few geometries: {all_geometries[:3]}")
+
+    dataset_get_raw_test = False
+    if dataset_get_raw_test:
+        # Verify that getting the dataset raw will take the same amount of time each time
+        def time_getting_raw_dataset() -> float:
+            t0 = time.perf_counter()
+            dataset = get_example_forcing_dataset_raw(quiet=True)
+            t1 = time.perf_counter()
+            # print(f"Raw dataset loaded with shape: {dataset.RAINRATE.shape}")
+            return t1 - t0
+
+        time_limit = 10.0  # seconds
+        num_tests_limit = 100  # maximum number of tests to run in case they are very fast
+        times = []
+        before_test = time.perf_counter()
+        while True:
+            start_of_loop = time.perf_counter()
+            if start_of_loop - before_test > time_limit:
+                break
+            elif len(times) >= num_tests_limit:
+                break
+            time_taken = time_getting_raw_dataset()
+            print(f"Test {len(times) + 1}: {time_taken:.2f} seconds")
+            times.append(time_taken)
+        time_array = np.array(times)
+        avg_time = np.mean(time_array)
+        std_time = np.std(time_array)
+        var_time = np.var(time_array)
+        sub_avg = time_array - avg_time
+        abs_sub_avg = np.abs(sub_avg)
+        max_deviation = np.max(abs_sub_avg)
+        min_deviation = np.min(abs_sub_avg)
+        min_time = np.min(time_array)
+        max_time = np.max(time_array)
+        print(f"Ran {len(times)} tests in {time.perf_counter() - before_test:.2f} seconds")
+        print(f"Average time to get raw dataset: {avg_time:.2f} seconds")
+        print(f"Standard deviation of time: {std_time:.2f} seconds")
+        print(f"Variance of time: {var_time:.4f} seconds^2")
+        print(f"Maximum deviation from average: {max_deviation:.2f} seconds")
+        print(f"Minimum deviation from average: {min_deviation:.2f} seconds")
+        print(f"Minimum time: {min_time:.2f} seconds")
+        print(f"Maximum time: {max_time:.2f} seconds")
+
+    dataset_clipping_test = True
+    if dataset_clipping_test:
+        from forecasting_data.show_util import show
+
+        def get_dataset_shape(dataset: xr.Dataset) -> Tuple[int, int]:
+            """
+            Get the shape of the dataset as (height, width).
+
+            Args:
+                dataset (xr.Dataset): The xarray Dataset to get the shape of.
+            Returns:
+                Tuple[int, int]: A tuple containing the height and width of the dataset.
+            """
+            height = dataset.sizes["y"]
+            width = dataset.sizes["x"]
+            return (height, width)
+
+        def clip_data_array_to_bbox(
+            data_array: xr.DataArray, left: int, right: int, bottom: int, top: int
+        ) -> xr.DataArray:
+            """
+            Clip the data array to the specified bounding box.
+
+            Args:
+                data_array (xr.DataArray): The xarray DataArray to clip.
+                left (int): The left boundary (starting column index).
+                right (int): The right boundary (end column index exclusive).
+                bottom (int): The bottom boundary (starting row index).
+                top (int): The top boundary (end row index exclusive).
+            Returns:
+                xr.DataArray: The clipped xarray DataArray.
+            """
+            before_dims = data_array.dims
+            before_sizes = data_array.sizes
+            clipped_data = data_array[:, bottom:top, left:right]
+            after_dims = clipped_data.dims
+            after_sizes = clipped_data.sizes
+            print(f"Clipped data from dims {before_dims} to {after_dims}")
+            print(f"Clipped data from sizes {before_sizes} to {after_sizes}")
+            return clipped_data
+
+        def rescale_data_array(data_array: xr.DataArray, scaleX: int, scaleY: int) -> xr.DataArray:
+            """
+            Rescale the data array by the specified factors.
+
+            Args:
+                data_array (xr.DataArray): The xarray DataArray to rescale.
+                scaleX (int): The factor by which to rescale the x dimension.
+                scaleY (int): The factor by which to rescale the y dimension.
+            Returns:
+                xr.DataArray: The rescaled xarray DataArray.
+            """
+            before_dims = data_array.dims
+            before_sizes = data_array.sizes
+            # Use coarsen to downsample the data array
+            rescaled_data: xr.DataArray = data_array.coarsen(
+                x=scaleX, y=scaleY, boundary="trim"
+            ).mean()
+            after_dims = rescaled_data.dims
+            after_sizes = rescaled_data.sizes
+            print(f"Rescaled data from dims {before_dims} to {after_dims}")
+            print(f"Rescaled data from sizes {before_sizes} to {after_sizes}")
+            return rescaled_data
+
+        def false_view_data(data_array: xr.DataArray) -> xr.DataArray:
+            """
+            Force the computation of the data array by iterating over it.
+            Args:
+                data_array (xr.DataArray): The xarray DataArray to force computation on.
+            Returns:
+                xr.DataArray: The same xarray DataArray, but with data computed.
+            """
+            # Iterate over the data array to force computation
+            sizes = data_array.sizes
+
+            def next_index(sizes: Dict[str, int], current: Dict[str, int]) -> Dict[str, int]:
+                keys = list(sizes.keys())
+                next_indices = current.copy()
+                enumerated = list(enumerate(keys))
+                for i, key in reversed(enumerated):
+                    # Try incrementing the rightmost index first
+                    if next_indices[key] + 1 >= sizes[key]:
+                        # It would overflow, so set it to 0 and carry the increment to the next index
+                        next_indices[key] = 0
+                        continue
+                    else:
+                        next_indices[key] += 1
+                        return next_indices
+                # If we get here, we've overflowed all indices and set them all to 0
+                return None
+
+            current_index = {key: 0 for key in sizes.keys()}
+            while current_index is not None:
+                val = data_array[tuple(current_index.values())]
+                current_index = next_index(sizes, current_index)
+            return data_array
+
+        before_dataset_clipping_test = time.perf_counter()
+        example_dataset = get_example_forcing_dataset_raw()
+        after_raw = time.perf_counter()
+        print(
+            f"Loaded raw example dataset in {after_raw - before_dataset_clipping_test:.2f} seconds"
+        )
+        print(f"Raw dataset shape: {get_dataset_shape(example_dataset)}")
+        after_shape = time.perf_counter()
+        print(f"Got raw dataset shape in {after_shape - after_raw:.2f} seconds")
+        example_rainrate: xr.DataArray = example_dataset["RAINRATE"]
+        after_rainrate = time.perf_counter()
+        print(f"Accessed RAINRATE in {after_rainrate - after_shape:.2f} seconds")
+        clipped_dataset = clip_data_array_to_bbox(
+            example_rainrate, left=1000, right=2000, bottom=1000, top=2000
+        )
+        after_clipping = time.perf_counter()
+        print(f"Clipped data in {after_clipping - after_rainrate:.2f} seconds")
+
+        # Want to evaluate if it's faster to clip then rescale, or rescale then clip...
+        # Does rescaling load the full dataset into memory? Does clipping?
+        def rescale_then_clip(
+            data_array: xr.DataArray,
+            scaleX: int,
+            scaleY: int,
+            left: int,
+            right: int,
+            bottom: int,
+            top: int,
+        ) -> xr.DataArray:
+            rescaled = rescale_data_array(data_array, scaleX, scaleY)
+            clipped = clip_data_array_to_bbox(
+                rescaled, left // scaleX, right // scaleX, bottom // scaleY, top // scaleY
+            )
+            return clipped
+
+        def clip_then_rescale(
+            data_array: xr.DataArray,
+            scaleX: int,
+            scaleY: int,
+            left: int,
+            right: int,
+            bottom: int,
+            top: int,
+        ) -> xr.DataArray:
+            clipped = clip_data_array_to_bbox(data_array, left, right, bottom, top)
+            rescaled = rescale_data_array(clipped, scaleX, scaleY)
+            return rescaled
+
+        scaleArg = {"scaleX": 16, "scaleY": 16}
+        bboxArg = {"left": 1000, "right": 2000, "bottom": 1000, "top": 2000}
+
+        def clip_then_rescale_test():
+            data_for_test = get_example_forcing_dataset_raw()["RAINRATE"]
+            t0 = time.perf_counter()
+            result = clip_then_rescale(data_for_test, **scaleArg, **bboxArg)
+            t1 = time.perf_counter()
+            result_loaded = false_view_data(result)
+            t2 = time.perf_counter()
+            print(f"Clip then rescale took {t1 - t0:.2f} seconds")
+            print(f"\tForced loading data took an additional {t2 - t1:.2f} seconds")
+            print(f"\tTotal time: {t2 - t0:.2f} seconds")
+            return result
+
+        def rescale_then_clip_test():
+            data_for_test = get_example_forcing_dataset_raw()["RAINRATE"]
+            t0 = time.perf_counter()
+            result = rescale_then_clip(data_for_test, **scaleArg, **bboxArg)
+            t1 = time.perf_counter()
+            result_loaded = false_view_data(result)
+            t2 = time.perf_counter()
+            print(f"Rescale then clip took {t1 - t0:.2f} seconds")
+            print(f"\tForced loading data took an additional {t2 - t1:.2f} seconds")
+            print(f"\tTotal time: {t2 - t0:.2f} seconds")
+            return result
+
+        print("Testing rescale then clip...")
+        rescale_then_clip_result = rescale_then_clip_test()
+        print("Testing clip then rescale...")
+        clip_then_rescale_result = clip_then_rescale_test()
+        print(f"Rescale then clip result shape: {rescale_then_clip_result.shape}")
+        print(f"Clip then rescale result shape: {clip_then_rescale_result.shape}")
+
+        print(f"Final time taken: {after_clipping - before_dataset_clipping_test:.2f} seconds")
+
+        # Quickly check what iteration does...
+        num_items = 0
+        before_iter = time.perf_counter()
+        for item in clip_then_rescale_result:
+            if num_items < 1:
+                print(f"\tIterated item: {item}")
+                print(f"\tIterated item shape: {item.shape if hasattr(item, 'shape') else 'N/A'}")
+                print(f"\tIterated item type: {type(item)}")
+            num_items += 1
+        after_iter = time.perf_counter()
+        print(f"Total items iterated over: {num_items}")
+        print(f"Time taken to iterate: {after_iter - before_iter:.2f} seconds")

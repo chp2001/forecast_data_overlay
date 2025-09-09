@@ -4,7 +4,7 @@ if __name__ == "__main__":
     import sys
 
     sys.path.append("./modules/")
-from typing import List, Optional, Dict, Tuple, Callable
+from typing import List, Optional, Dict, Tuple, Callable, Union
 import xarray as xr
 import fsspec
 import ujson
@@ -170,7 +170,7 @@ def reproject_points(
 
 
 def reproject_points_2d(
-    dataset: xr.Dataset,
+    dataset: Union[xr.Dataset, pyproj.Transformer],
     points: List[List[Tuple[float, float]]],
 ) -> List[List[Tuple[float, float]]]:
     """
@@ -183,9 +183,16 @@ def reproject_points_2d(
     Returns:
         List[List[Tuple[float, float]]]: 2D list of reprojected (longitude, latitude) coordinates.
     """
-    current_projection = get_dataset_projection(dataset)
-    target_projection = "EPSG:4326"
-    transformer = pyproj.Transformer.from_crs(current_projection, target_projection, always_xy=True)
+    if isinstance(dataset, xr.Dataset):
+        current_projection = get_dataset_projection(dataset)
+        target_projection = "EPSG:4326"
+        transformer = pyproj.Transformer.from_crs(
+            current_projection, target_projection, always_xy=True
+        )
+    elif isinstance(dataset, pyproj.Transformer):
+        transformer = dataset
+    else:
+        raise ValueError("dataset must be either an xarray.Dataset or a pyproj.Transformer")
     reprojected_points = [[transformer.transform(x, y) for x, y in row] for row in points]
     return reprojected_points
 

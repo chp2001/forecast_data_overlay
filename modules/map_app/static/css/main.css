@@ -32,7 +32,7 @@ main {
 
 #toggle-button-gages, #toggle-button-camels, #toggle-button-nwm, #toggle-button-aorc, #toggle-button-forecast {
   position: relative;
-  top: 20px;
+  /* top: 20px; */
   /* left: 20px; */
   background-color: light-dark(rgb(87, 27, 98), rgb(147, 51, 164));
   color: light-dark(#f0ead6, #ffffff);
@@ -334,9 +334,12 @@ input[type="datetime-local"] {
 }
 
 #options-panel.expanded {
-    width: 200px;
-    height: auto;
+    /* width: 200px; */
+    min-width: 200px;
+    max-width: 300px;
+    height: 475px;
     transform: translateX(0);
+    overflow-y: scroll;
 }
 
 #options-panel.hidden {

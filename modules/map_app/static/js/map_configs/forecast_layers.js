@@ -18,6 +18,25 @@ map.on("load", () => {
       "line-opacity": 0.1
     }
   });
+
+  map.addSource("forecasting_gridlines_region", {
+    type: "geojson",
+    data: {
+      type: "FeatureCollection",
+      features: []
+    }
+  });
+
+  map.addLayer({
+    id: "forecasting_gridlines_region_layer",
+    type: "line",
+    source: "forecasting_gridlines_region",
+    paint: {
+      "line-color": ["get", "color"],
+      "line-width": 2,
+      "line-opacity": 1.0
+    }
+  });
 });
 map.on("load", () => {
   map.addSource("forecasted_precip", {
@@ -57,9 +76,10 @@ function updateForecastingGridlines() {
       const features = [];
       // Process horizontal gridlines
       // Each line is an array of tuples [x, y]
-      data.horiz_gridlines.forEach(line => {
+      data.horiz_gridlines.forEach((line, idx) => {
         features.push({
           type: "Feature",
+          id: `horiz-${idx}`,
           geometry: {
             type: "LineString",
             coordinates: line.map(point => [point[0], point[1]]),
@@ -71,9 +91,10 @@ function updateForecastingGridlines() {
         });
       });
       // Process vertical gridlines
-      data.vert_gridlines.forEach(line => {
+      data.vert_gridlines.forEach((line, idx) => {
         features.push({
           type: "Feature",
+          id: `vert-${idx}`,
           geometry: {
             type: "LineString",
             coordinates: line.map(point => [point[0], point[1]]),
@@ -90,15 +111,63 @@ function updateForecastingGridlines() {
       });
       // We were successful, return true
       console.log('Forecasting gridlines updated successfully.');
+      // Use gridline data to set the region selection properties
+      
+      const scaleX = data.scaleX;
+      const scaleY = data.scaleY;
+      const numRows = data.horiz_gridlines.length * scaleY;
+      const numCols = data.vert_gridlines.length * scaleX;
+      externalSetRegionBounds(0, numRows, 0, numCols, scaleY, scaleX);
+
       return true;
     })
     .catch(error => {
       console.error('Error fetching forecasting gridlines data:', error);
     });
 }
+function highlightRegionBounds(rowMin, rowMax, colMin, colMax) {
+  // Selects the edge gridlines to highlight the selected region
+  // rowMin, rowMax, colMin, colMax are integers
+  const features = map.getSource("forecasting_gridlines")._data.features;
+  var regionFeatures = [];
+  for (let feature of features) {
+    if (feature.id.startsWith("horiz-")) {
+      // Horizontal line, check if its index is rowMin or rowMax
+      const index = parseInt(feature.id.split("-")[1]);
+      if (index === rowMin || index === rowMax - 1) {
+        modifiedFeature = JSON.parse(JSON.stringify(feature));
+        modifiedFeature.properties.color = "rgba(255, 0, 0, 1)"; // Highlight color
+        regionFeatures.push(modifiedFeature);
+      }
+    }
+    else if (feature.id.startsWith("vert-")) {
+      // Vertical line, check if its index is colMin or colMax
+      const index = parseInt(feature.id.split("-")[1]);
+      if (index === colMin || index === colMax - 1) {
+        modifiedFeature = JSON.parse(JSON.stringify(feature));
+        modifiedFeature.properties.color = "rgba(255, 0, 0, 1)"; // Highlight color
+        regionFeatures.push(modifiedFeature);
+      }
+    }
+  }
+  // Update the source data
+  map.getSource("forecasting_gridlines_region").setData({
+    type: "FeatureCollection",
+    features: regionFeatures
+  });
+  console.log('Region bounds highlighted:', { rowMin, rowMax, colMin, colMax });
+}
 show_gridlines = true;
 if (show_gridlines) {
   map.on("load", updateForecastingGridlines); // Load gridlines on map load
+  setRegionCallbacks.push(() => {
+    highlightRegionBounds(
+      targetRegionBounds.rowMin / regionProperties.stepRow,
+      targetRegionBounds.rowMax / regionProperties.stepRow,
+      targetRegionBounds.colMin / regionProperties.stepCol,
+      targetRegionBounds.colMax / regionProperties.stepCol
+    );
+  });
 }
 
 
@@ -377,66 +446,3 @@ document.getElementById('set-time').addEventListener('click', function () {
       });
   }
 });
-
-// On page load, we use the `tryget_resume_session` endpoint to check if there is a session to resume
-function updateWithResumedSession(data) {
-  if (!data) {
-    console.error('No data received for resumed session.');
-    return;
-  }
-  if (data.selected_time) {
-    var selectedTime = data.selected_time;
-    // Received value is YYYYMMDD, convert it to YYYY-MM-DDTHH:MM
-    selectedTime = selectedTime.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3T00:00');
-    document.getElementById('selected-time').textContent = selectedTime;
-    document.getElementById('target-time').value = selectedTime;
-  }
-  if (data.lead_time) {
-    document.getElementById('selected-lead-time').textContent = data.lead_time;
-    document.getElementById('lead-time').value = data.lead_time;
-  }
-  if (data.forecast_cycle) {
-    document.getElementById('selected-forecast-cycle').textContent = data.forecast_cycle;
-    document.getElementById('forecast-cycle').value = data.forecast_cycle;
-  }
-  if (data.scaleX) {
-    document.getElementById('set-scale-x-value').textContent = data.scaleX;
-  }
-  if (data.scaleY) {
-    document.getElementById('set-scale-y-value').textContent = data.scaleY;
-  }
-  if (data.forecasted_forcing_data_dict) {
-    console.log('Resuming session with forecasted forcing data:', data.forecasted_forcing_data_dict);
-    updateForecastLayer(data.forecasted_forcing_data_dict);
-  }
-  // If there are any other session data to resume, handle them here
-}
-
-// If response is 200, we update the page with the resumed session data
-// If response is 404, we do nothing, there is no session to resume
-function fetchResumeSession() {
-  fetch('/tryget_resume_session')
-    .then(response => {
-      if (response.status === 200) {
-        return response.json();
-      } else if (response.status === 404) {
-        console.log('No session to resume.');
-        return null;
-      } else {
-        throw new Error('Unexpected response status: ' + response.status);
-      }
-    })
-    .then(data => {
-      if (data) {
-        updateWithResumedSession(data);
-      }
-    })
-    .catch(error => {
-      console.error('Error fetching resumed session data:', error);
-    }
-  );
-}
-// On page load, we check if there is a session to resume
-// document.addEventListener('DOMContentLoaded', fetchResumeSession);
-// still too early, errors due to map not being ready
-map.on('load', fetchResumeSession);

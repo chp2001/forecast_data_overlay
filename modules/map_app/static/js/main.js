@@ -122,5 +122,3 @@ map.on("click", "conus_gages", (e) => {
   );
 });
 
-// Set up the map overlay for forecasted precipitation
-// We don't have a tilemap ready for this, so we need to create the geometries ourselves
