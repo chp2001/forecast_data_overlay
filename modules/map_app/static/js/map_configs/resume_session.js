@@ -38,8 +38,21 @@ function updateWithResumedSession(data) {
     )
   }
   if (data.forecasted_forcing_data_dict) {
-    console.log('Resuming session with forecasted forcing data:', data.forecasted_forcing_data_dict);
-    updateForecastLayer(data.forecasted_forcing_data_dict);
+    var data_forcing_dict = JSON.parse(data.forecasted_forcing_data_dict);
+    var geoms_for_print = data_forcing_dict['geometries'];
+    if (geoms_for_print.length > 3) {
+      geoms_for_print = geoms_for_print.slice(0, 3);
+      geoms_for_print.push('... (truncated from ' + data_forcing_dict['geometries'].length + ' total)');
+    }
+    var values_for_print = data_forcing_dict['values'];
+    if (values_for_print.length > 3) {
+      values_for_print = values_for_print.slice(0, 3);
+      values_for_print.push('... (truncated from ' + data_forcing_dict['values'].length + ' total)');
+    }
+    console.log('Resuming session with geometries:', geoms_for_print);
+    console.log('Resuming session with values:', values_for_print);
+    // updateForecastLayer(data.forecasted_forcing_data_dict);
+    updateForecastLayer(data_forcing_dict);
   }
   // If there are any other session data to resume, handle them here
 }

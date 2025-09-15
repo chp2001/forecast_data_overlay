@@ -435,18 +435,28 @@ else:
         # At this stage, time axis is not eliminated, but is very likely to be length 1
         geoms = []
         values = []
+        processed_data_points = 0
         for t in range(precip_data_array.shape[0]):
             for y in range(precip_data_array.shape[1]):
                 for x in range(precip_data_array.shape[2]):
-                    if len(geoms)==0:
-                        print(f"Processing first data point at {perf_counter() - t0:.2f} seconds since start")
+                    if processed_data_points == 0:
+                        processed_data_points += 1
+                        print(
+                            f"Processing first data point at {perf_counter() - t0:.2f} seconds since start"
+                        )
                     value = precip_data_array_np[t, y, x]
                     if isnan(value) or isclose(value, 0.0, atol=1e-6):
                         continue
                     x_coord = precip_data_array.x[x].item()
                     y_coord = precip_data_array.y[y].item()
                     # Get the geometry for the point
-                    geom = get_simple_point_geometry(x_coord, y_coord, baseWidth=1000, scaleX=scaleX, scaleY=scaleY)
+                    geom = get_simple_point_geometry(
+                        x_coord, y_coord, baseWidth=1000, scaleX=scaleX, scaleY=scaleY
+                    )
+                    if len(geoms) == 0:
+                        print(
+                            f"Adding first geometry at {perf_counter() - t0:.2f} seconds since start"
+                        )
                     geoms.append(geom)
                     values.append(value)
         reprojected_geoms = reproject_points_2d(transformer, geoms)
