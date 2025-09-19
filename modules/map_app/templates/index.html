@@ -16,6 +16,13 @@
 </head>
 
 <body>
+    <!-- <script src="{{ url_for('static', filename='js/components/double_labeled_slider.js' ) }}"></script> -->
+    <!-- Use jinja templating to load all of the files in js/components/ -->
+    <p>{{components_filenames}}</p>
+    {% for filename in components_filenames %}
+    <script src="{{ url_for('static', filename='js/components/' + filename) }}"></script>
+    {% endfor %}
+    <test-element></test-element>
     <!-- <header>
         <h1>Select catchments by clicking!</h1>
     </header> -->
@@ -122,6 +129,7 @@
     <script src="{{ url_for('static', filename='js/console.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/data_processing.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js' ) }}"></script>
+    <!-- Leaving these manual... Trying to dynamically load them causes problems -->
     <script src="{{ url_for('static', filename='js/map_configs/scale_config.js' ) }}"></script>
     <script src="{{ url_for('static', filename='js/map_configs/time_config.js' ) }}"></script>
     <script src="{{ url_for('static', filename='js/map_configs/basic_layers.js' ) }}"></script>
