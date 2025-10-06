@@ -13,12 +13,24 @@
  * @property {number?} colMax - The maximum column (x) index (exclusive), or null if unchanged
  */
 /**
+ * @typedef {Object} regionSliderBounds
+ * @property {number} rowMin - The minimum allowable row (y) index
+ * @property {number} rowMax - The maximum allowable row (y) index
+ * @property {number} colMin - The minimum allowable column (x) index
+ * @property {number} colMax - The maximum allowable column (x) index
+ */
+/**
  * @callback regionSetCallback
  * @param {regionBoundArgs} bounds - The new values
  */
 /**
  * @callback regionSelectionCallback
  * @param {regionBoundArgs} bounds - The new selection values
+ */
+
+// import the double-labeled-slider component from components/double_labeled_slider.js
+/**
+ * @import { double_labeled_slider } from './double_labeled_slider.js';
  */
 
 class region_selector extends HTMLElement {
@@ -70,6 +82,7 @@ class region_selector extends HTMLElement {
         }
         this.regionSetCallbacks[key] = func;
     }
+
     /**
      * Remove a previously added onRegionSet callback
      * @param {string} key - The unique key identifying the callback to remove
@@ -81,6 +94,7 @@ class region_selector extends HTMLElement {
         }
         delete this.regionSetCallbacks[key];
     }
+
     /**
      * Trigger all registered onRegionSet callbacks
      * @param {regionBoundArgs} options - The new region set values
@@ -90,6 +104,7 @@ class region_selector extends HTMLElement {
             this.regionSetCallbacks[key](options);
         }
     }
+
     /**
      * Add a function to be called when any region selection changes
      * @param {string} key - A unique key to identify the callback
@@ -103,6 +118,7 @@ class region_selector extends HTMLElement {
         }
         this.regionSelectionCallbacks[key] = func;
     }
+
     /**
      * Remove a previously added onRegionSelection callback
      * @param {string} key - The unique key identifying the callback to remove
@@ -114,6 +130,7 @@ class region_selector extends HTMLElement {
         }
         delete this.regionSelectionCallbacks[key];
     }
+    
     /**
      * Trigger all registered onRegionSelection callbacks
      * @param {regionBoundArgs} options - The new region selection values
@@ -174,15 +191,102 @@ class region_selector extends HTMLElement {
     }
 
     /**
+     * Set the region slider bounds
+     * @param {regionSliderBounds} options - The max and min acceptable values for each slider
+     */
+    setSliderBounds({rowMin = null, rowMax = null, colMin = null, colMax = null}={}) {
+        const silent = false; 
+        // This should not be triggerable from the sliders' end,
+        // so silence is not necessary.
+        this.yMinSlider.setExternally({min: rowMin, max: rowMax, silent: silent});
+        this.yMaxSlider.setExternally({min: rowMin, max: rowMax, silent: silent});
+        this.xMinSlider.setExternally({min: colMin, max: colMax, silent: silent});
+        this.xMaxSlider.setExternally({min: colMin, max: colMax, silent: silent});
+    }
+
+    /**
+     * On selection change for row min slider, ensure it does not exceed row max
+     * @param {number} value - The new selection value
+     */
+    onYMinSelectionChange(value) {
+        const spacing = this.yMaxSlider.step * 2;
+        if (value >= this.yMaxSlider.selectionValue - spacing) {
+            // If the new min >= max, set the min back to one step below the max
+            this.yMinSlider.setExternally({
+                selectionValue: this.yMaxSlider.selectionValue - spacing, 
+                silent: true
+            });
+        } else {
+            // Else, just trigger the change
+            this.triggerOnRegionSelection({rowMin: value, rowMax: null, colMin: null, colMax: null});
+        }
+    }
+
+    /**
+     * On selection change for row max slider, ensure it does not go below row min
+     * @param {number} value - The new selection value
+     */
+    onYMaxSelectionChange(value) {
+        const spacing = this.yMaxSlider.step * 2;
+        if (value <= this.yMinSlider.selectionValue + spacing) {
+            // If the new max <= min, set the max back to one step above the min
+            this.yMaxSlider.setExternally({
+                selectionValue: this.yMinSlider.selectionValue + spacing, 
+                silent: true
+            });
+        } else {
+            // Else, just trigger the change
+            this.triggerOnRegionSelection({rowMin: null, rowMax: value, colMin: null, colMax: null});
+        }
+    }
+
+    /**
+     * On selection change for column min slider, ensure it does not exceed column max
+     * @param {number} value - The new selection value
+     */
+    onXMinSelectionChange(value) {
+        const spacing = this.xMaxSlider.step * 2;
+        if (value >= this.xMaxSlider.selectionValue - spacing) {
+            // If the new min >= max, set the min back to one step below the max
+            this.xMinSlider.setExternally({
+                selectionValue: this.xMaxSlider.selectionValue - spacing, 
+                silent: true
+            });
+        } else {
+            // Else, just trigger the change
+            this.triggerOnRegionSelection({rowMin: null, rowMax: null, colMin: value, colMax: null});
+        }
+    }
+
+    /**
+     * On selection change for column max slider, ensure it does not go below column min
+     * @param {number} value - The new selection value
+     */
+    onXMaxSelectionChange(value) {
+        const spacing = this.xMaxSlider.step * 2;
+        if (value <= this.xMinSlider.selectionValue + spacing) {
+            // If the new max <= min, set the max back to one step above the min
+            this.xMaxSlider.setExternally({
+                selectionValue: this.xMinSlider.selectionValue + spacing, 
+                silent: true
+            });
+        } else {
+            // Else, just trigger the change
+            this.triggerOnRegionSelection({rowMin: null, rowMax: null, colMin: null, colMax: value});
+        }
+    }
+
+    /**
      * Handle changes in selection sliders
      * @param {regionBoundArgs} changed - The changed values
      */
     onRegionSelectionChange(changed) {
-        // Probably need to handle dynamic constraints here
-        // i.e. prevent min from being changed to be >= max, etc.
-        // For now, do nothing
+        this.triggerOnRegionSelection(changed);
     }
 
+    /**
+     * Handle the Set Region button click
+     */
     onSetButtonClick() {
         this.xMinSlider.setButton();
         this.xMaxSlider.setButton();
@@ -194,6 +298,31 @@ class region_selector extends HTMLElement {
             colMin: this.xMinSlider.setValue,
             colMax: this.xMaxSlider.setValue
         });
+    }
+
+    get rowMinSetValue() {
+        return this.yMinSlider.setValue;
+    }
+    get rowMaxSetValue() {
+        return this.yMaxSlider.setValue;
+    }
+    get colMinSetValue() {
+        return this.xMinSlider.setValue;
+    }
+    get colMaxSetValue() {
+        return this.xMaxSlider.setValue;
+    }
+    get rowMinSelectionValue() {
+        return this.yMinSlider.selectionValue;
+    }
+    get rowMaxSelectionValue() {
+        return this.yMaxSlider.selectionValue;
+    }
+    get colMinSelectionValue() {
+        return this.xMinSlider.selectionValue;
+    }
+    get colMaxSelectionValue() {
+        return this.xMaxSlider.selectionValue;
     }
 
     build() {
@@ -235,6 +364,15 @@ class region_selector extends HTMLElement {
             value: 1264,
             width: '300px',
         })
+        // Set up callbacks for row sliders
+        this.yMinSlider.addOnChangeFunction(
+            'region-selector-ymin-selection-change-' + this.uuid,
+            this.onYMinSelectionChange.bind(this)
+        );
+        this.yMaxSlider.addOnChangeFunction(
+            'region-selector-ymax-selection-change-' + this.uuid,
+            this.onYMaxSelectionChange.bind(this)
+        );
 
         // Column sliders label
         var xrangeLabel = document.createElement('label');
@@ -254,7 +392,15 @@ class region_selector extends HTMLElement {
             value: 2416,
             width: '300px',
         })
-
+        // Set up callbacks for column sliders
+        this.xMinSlider.addOnChangeFunction(
+            'region-selector-xmin-selection-change-' + this.uuid,
+            this.onXMinSelectionChange.bind(this)
+        );
+        this.xMaxSlider.addOnChangeFunction(
+            'region-selector-xmax-selection-change-' + this.uuid,
+            this.onXMaxSelectionChange.bind(this)
+        );
 
         // Set Button
         this.setButton = document.createElement('button');

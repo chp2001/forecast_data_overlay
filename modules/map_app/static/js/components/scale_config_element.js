@@ -19,6 +19,11 @@
  * @param {number?} options.yScale - The new y scale selection value. Null if unchanged
  */
 
+// import the double-labeled-slider component from components/double_labeled_slider.js
+/**
+ * @import { double_labeled_slider } from './double_labeled_slider.js';
+ */
+
 class scale_config extends HTMLElement {
     constructor() {
         super();
