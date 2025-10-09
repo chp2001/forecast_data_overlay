@@ -23,24 +23,25 @@ function updateWithResumedSession(data) {
     // Update time config using the new component
     if (data.selected_time || data.lead_time || data.forecast_cycle) {
         var timeConfigArgs = {};
-        if (data.selected_time) {
+        if (data.selected_time != null) {
             var selectedTime = data.selected_time;
             // Received value is YYYYMMDD, convert it to YYYY-MM-DD
             selectedTime = selectedTime.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
             timeConfigArgs['target_time'] = selectedTime;
         }
-        if (data.lead_time) {
+        if (data.lead_time != null) {
             timeConfigArgs['lead_time'] = data.lead_time;
         }
-        if (data.forecast_cycle) {
+        if (data.forecast_cycle != null) {
             timeConfigArgs['forecast_cycle'] = data.forecast_cycle;
         }
-        if (data.range_mode) {
+        if (data.range_mode != null) {
             timeConfigArgs['range_mode'] = data.range_mode;
         }
-        if (data.lead_time_end) {
+        if (data.lead_time_end != null) {
             timeConfigArgs['lead_time_end'] = data.lead_time_end;
         }
+        console.log('Resuming session with time config args:', timeConfigArgs);
         timeConfigElement.externallySetFull(timeConfigArgs);
     }
 
