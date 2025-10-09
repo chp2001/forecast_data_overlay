@@ -5,21 +5,46 @@ function updateWithResumedSession(data) {
         console.error('No data received for resumed session.');
         return;
     }
-    if (data.selected_time) {
-        var selectedTime = data.selected_time;
-        // Received value is YYYYMMDD, convert it to YYYY-MM-DDTHH:MM
-        selectedTime = selectedTime.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3T00:00');
-        document.getElementById('selected-time').textContent = selectedTime;
-        document.getElementById('target-time').value = selectedTime;
+    // if (data.selected_time) {
+    //     var selectedTime = data.selected_time;
+    //     // Received value is YYYYMMDD, convert it to YYYY-MM-DDTHH:MM
+    //     selectedTime = selectedTime.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3T00:00');
+    //     document.getElementById('selected-time').textContent = selectedTime;
+    //     document.getElementById('target-time').value = selectedTime;
+    // }
+    // if (data.lead_time) {
+    //     document.getElementById('selected-lead-time').textContent = data.lead_time;
+    //     document.getElementById('lead-time').value = data.lead_time;
+    // }
+    // if (data.forecast_cycle) {
+    //     document.getElementById('selected-forecast-cycle').textContent = data.forecast_cycle;
+    //     document.getElementById('forecast-cycle').value = data.forecast_cycle;
+    // }
+    // Update time config using the new component
+    if (data.selected_time || data.lead_time || data.forecast_cycle) {
+        var timeConfigArgs = {};
+        if (data.selected_time) {
+            var selectedTime = data.selected_time;
+            // Received value is YYYYMMDD, convert it to YYYY-MM-DD
+            selectedTime = selectedTime.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+            timeConfigArgs['target_time'] = selectedTime;
+        }
+        if (data.lead_time) {
+            timeConfigArgs['lead_time'] = data.lead_time;
+        }
+        if (data.forecast_cycle) {
+            timeConfigArgs['forecast_cycle'] = data.forecast_cycle;
+        }
+        if (data.range_mode) {
+            timeConfigArgs['range_mode'] = data.range_mode;
+        }
+        if (data.lead_time_end) {
+            timeConfigArgs['lead_time_end'] = data.lead_time_end;
+        }
+        timeConfigElement.externallySetFull(timeConfigArgs);
     }
-    if (data.lead_time) {
-        document.getElementById('selected-lead-time').textContent = data.lead_time;
-        document.getElementById('lead-time').value = data.lead_time;
-    }
-    if (data.forecast_cycle) {
-        document.getElementById('selected-forecast-cycle').textContent = data.forecast_cycle;
-        document.getElementById('forecast-cycle').value = data.forecast_cycle;
-    }
+
+
     // if (data.scaleX) {
     //     document.getElementById('set-scale-x-value').textContent = data.scaleX;
     // }

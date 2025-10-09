@@ -231,7 +231,8 @@ def get_forecast_precip():
     if t1 - t0 > 1.0:
         print(f"Reading request data took {t1 - t0:.2f} seconds")
     violations = []
-    if not selected_time or not forecast_cycle or not lead_time:
+    # if not selected_time or not forecast_cycle or not lead_time:
+    if any(v is None for v in [selected_time, forecast_cycle, lead_time]):
         # return jsonify({"error": "Forecast arguments not set"}), 400
         violation = "Forecast arguments not set (missing: "
         missing = [
@@ -241,9 +242,11 @@ def get_forecast_precip():
                 ("forecast_cycle", forecast_cycle),
                 ("lead_time", lead_time),
             ]
-            if not val
+            # if not val
+            if val is None
         ]
         violation += ", ".join(missing) + ")"
+        # violation += "\n" + "Full request data: " + json.dumps(request_data, indent=2)
         violations.append(violation)
     if any(v is not None for v in [rowMin, rowMax, colMin, colMax]) and not all(
         v is not None for v in [rowMin, rowMax, colMin, colMax]

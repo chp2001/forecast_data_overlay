@@ -77,6 +77,24 @@ var time_config_config = {
     submit_button_id: 'submit-time-config',
 }
 
+/**
+ * @typedef {Object} timeConfigArgs
+ * @property {string} target_time - The target time in YYYY-MM-DD format
+ * @property {number} lead_time - The lead time value
+ * @property {number} forecast_cycle - The forecast cycle value
+ * @property {boolean|null} range_mode - True if range mode is enabled, false otherwise
+ * @property {number|null} lead_time_end - The lead time end value (only if range mode)
+ */
+
+/**
+ * @callback onSubmitCallback
+ * @param {timeConfigArgs} args - The arguments passed to the callback
+ */
+
+/**
+ * @class time_config
+ * @extends {HTMLElement}
+ */
 class time_config extends HTMLElement {
     constructor() {
         super();
@@ -89,6 +107,12 @@ class time_config extends HTMLElement {
         // in connectedCallback() and later.
 
         // Initialize attributes
+
+        // Important interface object:
+        /**
+         * @type {Object.<string, onSubmitCallback>}
+         */
+        this.onSubmitFuncs = {};
 
         // Data attributes
         this.target_time = time_config_config.target_time_default_date; // expected to be '2025-07-04'
@@ -155,6 +179,43 @@ class time_config extends HTMLElement {
         console.log('Time Config ' + this.uuid + ' triggered callback. Building...');
 
         this.build();
+    }
+
+    // onSubmit function helpers
+
+    /**
+     * Add a function to be called when the submit button is pressed.
+     * @param {string} key - The unique key to identify the function.
+     * @param {onSubmitCallback} func - The function to call on submit.
+     */
+    addOnSubmitFunction(key, func) {
+        if (this.onSubmitFuncs[key]) {
+            console.error('Function with key ' + key + ' already exists. Use a unique key.');
+            return;
+        }
+        this.onSubmitFuncs[key] = func;
+    }
+
+    /**
+     * Remove a previously added onSubmit function.
+     * @param {string} key - The unique key identifying the function to remove.
+     */
+    removeOnSubmitFunction(key) {
+        if (!this.onSubmitFuncs[key]) {
+            console.error('Function with key ' + key + ' does not exist.');
+            return;
+        }
+        delete this.onSubmitFuncs[key];
+    }
+
+    /**
+     * Call all registered onSubmit functions with the provided arguments.
+     * @param {timeConfigArgs} args - The arguments to pass to the onSubmit functions.
+     */
+    triggerOnSubmit(args) {
+        for (const key in this.onSubmitFuncs) {
+            this.onSubmitFuncs[key](args);
+        }
     }
 
     /**
@@ -242,6 +303,51 @@ class time_config extends HTMLElement {
         }
         // this.selectedForecastCycleElement.textContent = this.selected_forecast_cycle || 'None';
         this.selectedForecastCycleElement.textContent = (this.selected_forecast_cycle !== null) ? this.selected_forecast_cycle : 'None';
+    }
+
+    /**
+     * Externally set the last submitted/loaded values.
+     * Will be called from the resume functionality.
+     * @param {timeConfigArgs} param0 - Object containing the values to set
+     */
+    externallySetPreviousValues({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null}={}) {
+        this.selected_target_time = target_time;
+        this.selected_lead_time = lead_time;
+        this.selected_forecast_cycle = forecast_cycle;
+        if (range_mode !== null) {
+            this.selected_range_mode = range_mode;
+        }
+        if (lead_time_end !== null) {
+            this.selected_lead_time_end = lead_time_end;
+        }
+        this.displaySelectedValues();
+    }
+
+    /**
+     * Externally set the current input values.
+     * Will be called from the resume functionality.
+     * @param {timeConfigArgs} param0 - Object containing the values to set
+     */
+    externallySetInputValues({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null}={}) {
+        this.selectTargetTime(target_time);
+        this.selectLeadTime(lead_time);
+        this.selectForecastCycle(forecast_cycle);
+        if (range_mode !== null) {
+            this.setRangeMode(range_mode);
+        }
+        if (lead_time_end !== null) {
+            this.selectLeadTimeEnd(lead_time_end);
+        }
+    }
+
+    /**
+     * Externally set both the previous submitted values and the current input values.
+     * Will be called from the resume functionality.
+     * @param {timeConfigArgs} param0 - Object containing the values to set
+     */
+    externallySetFull({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null}={}) {
+        this.externallySetPreviousValues({target_time, lead_time, forecast_cycle, range_mode, lead_time_end});
+        this.externallySetInputValues({target_time, lead_time, forecast_cycle, range_mode, lead_time_end});
     }
 
     /**
@@ -585,6 +691,23 @@ class time_config extends HTMLElement {
             this.selected_lead_time_end = this.lead_time_end;
             this.selected_forecast_cycle = this.forecast_cycle;
             this.displaySelectedValues();
+            // Trigger any registered onSubmit functions
+            if (this.range_mode) {
+                this.triggerOnSubmit({
+                    target_time: this.selected_target_time,
+                    lead_time: this.selected_lead_time,
+                    lead_time_end: this.selected_lead_time_end,
+                    forecast_cycle: this.selected_forecast_cycle,
+                    range_mode: this.selected_range_mode
+                });
+            } else {
+                this.triggerOnSubmit({
+                    target_time: this.selected_target_time,
+                    lead_time: this.selected_lead_time,
+                    forecast_cycle: this.selected_forecast_cycle,
+                    range_mode: this.selected_range_mode
+                });
+            }
         });
     }
 
