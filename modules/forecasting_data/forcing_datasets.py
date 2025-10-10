@@ -4,23 +4,27 @@ if __name__ == "__main__":
     import sys
 
     sys.path.append("./modules/")
-from typing import List, Optional, Dict, Tuple, Callable
+from typing import List, Optional, Dict, Tuple, Callable, TypeAlias
 import xarray as xr
 import os
 
 from forecasting_data.urlgen_enums import NWMRun, NWMVar, NWMGeo, NWMMem
 from forecasting_data.urlgen_builder import create_default_file_list, append_jsons
 import numpy as np
+from numpy import isclose
 import pickle
 import pyproj
 from functools import cache
+from time import perf_counter
 
 from forecasting_data.forecast_datasets import (
     load_dataset_from_json,
     load_datasets,
     load_datasets_parallel,
+    reproject_points_2d,
 )
 
+geom_t: TypeAlias = List[Tuple[float, float]]
 
 def load_forecasted_forcings(
     start_date: str,
@@ -111,9 +115,9 @@ def load_forecasted_forcing(
         fcst_cycle=[fcst_cycle],
         lead_time=[lead_time],
     )
-    assert len(file_list) == 1, (
-        f"Expected exactly one file for the specified parameters, got {len(file_list)}."
-    )
+    assert (
+        len(file_list) == 1
+    ), f"Expected exactly one file for the specified parameters, got {len(file_list)}."
     # Append .json to the file urls
     file_list = append_jsons(file_list)
     if not quiet:
@@ -209,9 +213,9 @@ def rescale_precip_dataset(
         coords=new_coords,
     )
     # Modify the coordinates to match the new shape
-    assert rescaled_dataset.RAINRATE.shape == rescaled_data.shape, (
-        f"Rescaled dataset shape {rescaled_dataset.RAINRATE.shape} does not match rescaled data shape {rescaled_data.shape}."
-    )
+    assert (
+        rescaled_dataset.RAINRATE.shape == rescaled_data.shape
+    ), f"Rescaled dataset shape {rescaled_dataset.RAINRATE.shape} does not match rescaled data shape {rescaled_data.shape}."
     return rescaled_dataset
 
 
@@ -428,6 +432,7 @@ def get_point_geometry(
     # Return the geometry as a list of tuples
     return geometry
 
+
 @cache
 def get_simple_point_geometry(
     x_coord: float,
@@ -526,7 +531,7 @@ def load_forecasted_forcing_with_options(
     if all(v is not None for v in [rowMin, rowMax, colMin, colMax]):
         rangeAdjustX = 16 if scaleX is not None else scaleX
         rangeAdjustY = 16 if scaleY is not None else scaleY
-        precip_data = precip_data[:, rowMin:rowMax-rangeAdjustY, colMin:colMax-rangeAdjustX]
+        precip_data = precip_data[:, rowMin : rowMax - rangeAdjustY, colMin : colMax - rangeAdjustX]
     if scaleX is not None and scaleY is not None:
         precip_data = precip_data.coarsen(x=scaleX, y=scaleY, boundary="trim").mean()
     transformer = pyproj.Transformer.from_crs(
@@ -534,6 +539,352 @@ def load_forecasted_forcing_with_options(
     )
     return precip_data, transformer
 
+def get_timestep_data_for_frontend(
+    selected_time: str,  # YYYYMMDD
+    fcst_cycle: int,
+    lead_time: int,
+    scaleX: Optional[int] = None,
+    scaleY: Optional[int] = None,
+    rowMin: Optional[int] = None,
+    rowMax: Optional[int] = None,
+    colMin: Optional[int] = None,
+    colMax: Optional[int] = None,
+    **kwargs
+) -> Dict[str, List]:
+    """
+    Migrated functionality from `views.py::get_forecast_precip` to a function,
+    to self-contain the logic for preparing the geometries and values for a single
+    timestep to send to the frontend.
+    """
+    # Wrapper for the cached version to allow for ignored arguments
+    return _get_timestep_data_for_frontend(
+        selected_time,
+        fcst_cycle,
+        lead_time,
+        scaleX,
+        scaleY,
+        rowMin,
+        rowMax,
+        colMin,
+        colMax,
+    )
+
+@cache
+def _get_timestep_data_for_frontend(
+    selected_time: str,  # YYYYMMDD
+    fcst_cycle: int,
+    lead_time: int,
+    scaleX: Optional[int] = None,
+    scaleY: Optional[int] = None,
+    rowMin: Optional[int] = None,
+    rowMax: Optional[int] = None,
+    colMin: Optional[int] = None,
+    colMax: Optional[int] = None,
+) -> Dict[str, List]:
+    """
+    Migrated functionality from `views.py::get_forecast_precip` to a function,
+    to self-contain the logic for preparing the geometries and values for a single
+    timestep to send to the frontend.
+    """
+    ## Configuration segment
+    # Enable timing logs for debugging performance issues
+    do_timing_logs = False
+
+    def tlog(*args, **kwargs):
+        if do_timing_logs:
+            print(*args, **kwargs)
+
+    # Function for paring down data unwanted on the frontend
+    def do_skip_value(value: float) -> bool:
+        # Skip values that are NaN, negative, or zero
+        if value is None or np.isnan(value) or isclose(value, 0.0, atol=1e-6):
+            return True
+        return False
+
+    ## End configuration segment
+    t0 = perf_counter()
+    # input validation first
+    scaleX = 1 if scaleX is None else scaleX
+    scaleY = 1 if scaleY is None else scaleY
+    # grab data the way the view function did first
+    precip_data_array, transformer = load_forecasted_forcing_with_options(
+        date=selected_time,
+        fcst_cycle=fcst_cycle,
+        lead_time=lead_time,
+        scaleX=scaleX,
+        scaleY=scaleY,
+        rowMin=rowMin,
+        rowMax=rowMax,
+        colMin=colMin,
+        colMax=colMax,
+    )
+    precip_data_array_np = precip_data_array.to_numpy()
+    t1 = perf_counter()
+    if any([v is None for v in [precip_data_array_np, transformer]]):
+        raise ValueError(f"Failed to load precip data or transformer in {t1 - t0:.2f} seconds")
+    if t1 - t0 > 1.0:
+        tlog(f"Loading forecasted forcing took {t1 - t0:.2f} seconds")
+    data_dict = {
+        "geometries": [],
+        "values": [],
+    }
+    x_coords: np.ndarray = precip_data_array.x.values
+    y_coords: np.ndarray = precip_data_array.y.values
+    for t in range(precip_data_array.shape[0]):
+        for y in range(precip_data_array.shape[1]):
+            for x in range(precip_data_array.shape[2]):
+                value = precip_data_array_np[t, y, x]
+                if do_skip_value(value):
+                    continue
+                x_coord = x_coords[x]
+                y_coord = y_coords[y]
+                geom = get_simple_point_geometry(
+                    x_coord=x_coord,
+                    y_coord=y_coord,
+                    baseWidth=1000,
+                    scaleX=scaleX,
+                    scaleY=scaleY,
+                )
+                data_dict["geometries"].append(geom)
+                data_dict["values"].append(value)
+    t2 = perf_counter()
+    if t2 - t1 > 1.0:
+        tlog(f"Processing data into geometries took {t2 - t1:.2f} seconds")
+    # Reproject the geometries using the transformer
+    data_dict["geometries"] = reproject_points_2d(transformer, data_dict["geometries"])
+    t3 = perf_counter()
+    if t3 - t2 > 1.0:
+        tlog(f"Reprojecting geometries took {t3 - t2:.2f} seconds")
+    if do_timing_logs:
+        tlog(f"Total time for get_timestep_data_for_frontend: {t3 - t0:.2f} seconds")
+    return data_dict
+
+@cache
+def _get_timestep_values_for_frontend(
+    selected_time: str,  # YYYYMMDD
+    fcst_cycle: int,
+    lead_time: int,
+    scaleX: Optional[int] = None,
+    scaleY: Optional[int] = None,
+    rowMin: Optional[int] = None,
+    rowMax: Optional[int] = None,
+    colMin: Optional[int] = None,
+    colMax: Optional[int] = None,
+) -> List[float]:
+    """
+    For multi-timestep data, we may want to get all values before deciding
+    which geometries to send to the frontend. This function gets just the values
+    for a given timestep, without the geometries.
+    """
+    ## Configuration segment
+    # Enable timing logs for debugging performance issues
+    do_timing_logs = False
+    # minimum time in seconds to log
+    do_timing_threshold = 1.0  
+    def tlog(*args, dt=None, thr=None, **kwargs):
+        threshold = thr if thr is not None else do_timing_threshold
+        if do_timing_logs:
+            if dt is not None and dt < threshold: return
+            print(*args, **kwargs)
+    # # Function for paring down data unwanted on the frontend
+    # (skipping paring, we want all values here)
+    ## End configuration segment
+    t0 = perf_counter()
+    # input validation first
+    scaleX = 1 if scaleX is None else scaleX
+    scaleY = 1 if scaleY is None else scaleY
+    # grab data the way the view function did first
+    # (Not working with geometry here, so ignore transformer)
+    precip_data_array, _ = load_forecasted_forcing_with_options(
+        date=selected_time,
+        fcst_cycle=fcst_cycle,
+        lead_time=lead_time,
+        scaleX=scaleX,
+        scaleY=scaleY,
+        rowMin=rowMin,
+        rowMax=rowMax,
+        colMin=colMin,
+        colMax=colMax,
+    )
+    precip_data_array_np = precip_data_array.to_numpy()
+    t1 = perf_counter()
+    if precip_data_array_np is None:
+        raise ValueError(f"Failed to load precip data in {t1 - t0:.2f} seconds")
+    tlog(f"Loading forecasted forcing took {t1 - t0:.2f} seconds", dt=t1 - t0)
+    values: List[float] = []
+    for t in range(precip_data_array.shape[0]):
+        for y in range(precip_data_array.shape[1]):
+            for x in range(precip_data_array.shape[2]):
+                value = precip_data_array_np[t, y, x]
+                values.append(value)
+    t2 = perf_counter()
+    tlog(f"Processing data into {len(values)} values took {t2 - t1:.2f} seconds", dt=t2 - t1, thr=0.5)
+    if do_timing_logs:
+        tlog(f"Total time for _get_timestep_values_for_frontend: {t2 - t0:.2f} seconds", dt=t2 - t0, thr=0.0)
+    return values
+
+def get_timesteps_data_for_frontend(
+    selected_time: str,  # YYYYMMDD
+    fcst_cycle: int,
+    # lead_times: List[int],
+    lead_times: Tuple[int, ...],
+    scaleX: Optional[int] = None,
+    scaleY: Optional[int] = None,
+    rowMin: Optional[int] = None,
+    rowMax: Optional[int] = None,
+    colMin: Optional[int] = None,
+    colMax: Optional[int] = None,
+    **kwargs
+) -> Tuple[Dict[int, List[float]], List[geom_t]]:
+    """
+    Get the values for multiple lead times, and a single common geometry set.
+    This is useful for sending multiple timesteps to the frontend at once,
+    without duplicating the geometry data.
+    
+    Data is requested from the `_get_timestep_values_for_frontend` function
+    for each lead time, and then geometries and values are filtered
+    as a group to reduce the amount of extra data and geometry sent to the frontend.
+    """
+    if isinstance(lead_times, list):
+        lead_times = tuple(lead_times)
+    # Wrapper for the cached version to allow for ignored arguments
+    return _get_timesteps_data_for_frontend(
+        selected_time,
+        fcst_cycle,
+        lead_times,
+        scaleX,
+        scaleY,
+        rowMin,
+        rowMax,
+        colMin,
+        colMax,
+    )
+
+@cache
+def _get_timesteps_data_for_frontend(
+    selected_time: str,  # YYYYMMDD
+    fcst_cycle: int,
+    # lead_times: List[int],
+    lead_times: Tuple[int, ...],
+    scaleX: Optional[int] = None,
+    scaleY: Optional[int] = None,
+    rowMin: Optional[int] = None,
+    rowMax: Optional[int] = None,
+    colMin: Optional[int] = None,
+    colMax: Optional[int] = None,
+) -> Tuple[Dict[int, List[float]], List[geom_t]]:
+    """
+    Get the values for multiple lead times, and a single common geometry set.
+    This is useful for sending multiple timesteps to the frontend at once,
+    without duplicating the geometry data.
+    
+    Data is requested from the `_get_timestep_values_for_frontend` function
+    for each lead time, and then geometries and values are filtered
+    as a group to reduce the amount of extra data and geometry sent to the frontend.
+    """
+    ## Configuration segment
+    # Enable timing logs for debugging performance issues
+    do_timing_logs = False
+
+    def tlog(*args, **kwargs):
+        if do_timing_logs:
+            print(*args, **kwargs)
+
+    # # Function for paring down data unwanted on the frontend
+    # def do_skip_value(value: float) -> bool:
+    #     # Skip values that are NaN, negative, or zero
+    #     if value is None or np.isnan(value) or isclose(value, 0.0, atol=1e-6):
+    #         return True
+    #     return False
+    # The group filtering is the primary purpose of this function,
+    # so trying to put it in as a configuration helper is counterproductive.
+    ## End configuration segment
+    t0 = perf_counter()
+    # input validation first
+    scaleX = 1 if scaleX is None else scaleX
+    scaleY = 1 if scaleY is None else scaleY
+    # lead_times = sorted(lead_times)
+    lead_times: List[int] = sorted(list(lead_times))
+    if not lead_times:
+        raise ValueError("No lead times specified.")
+    # Don't need to arrange the data into a dict until the end
+    sub_times: List[float] = [] # time checkpoints for each lead time load
+    lead_time_values: List[List[float]] = []
+    for lead_time in lead_times:
+        try:
+            values = _get_timestep_values_for_frontend(
+                selected_time,
+                fcst_cycle,
+                lead_time,
+                scaleX,
+                scaleY,
+                rowMin,
+                rowMax,
+                colMin,
+                colMax,
+            )
+            sub_times.append(perf_counter())
+            lead_time_values.append(values)
+        except Exception as e:
+            print(f"Error loading data for lead_time={lead_time}: {e}")
+            raise e
+    t1 = perf_counter()
+    assert len(lead_time_values) == len(lead_times), f"Mismatch in lead times and values lengths: {len(lead_times)} vs {len(lead_time_values)}"
+    tlog(f"Loading {len(lead_times)} lead times took {t1 - t0:.2f} seconds")
+    # Now we need to get the geometries for the first lead time.
+    precip_data_array, transformer = load_forecasted_forcing_with_options(
+        date=selected_time,
+        fcst_cycle=fcst_cycle,
+        lead_time=lead_times[0],
+        scaleX=scaleX,
+        scaleY=scaleY,
+        rowMin=rowMin,
+        rowMax=rowMax,
+        colMin=colMin,
+        colMax=colMax,
+    )
+    precip_data_array_np = precip_data_array.to_numpy()
+    t2 = perf_counter()
+    if any([v is None for v in [precip_data_array_np, transformer]]):
+        raise ValueError(f"Failed to load precip data or transformer in {t2 - t1:.2f} seconds")
+    tlog(f"Loading precip data for geometries took {t2 - t1:.2f} seconds")
+    values_dict: Dict[int, List[float]] = {lt: [] for lt in lead_times}
+    geometries: List[geom_t] = []
+    x_coords: np.ndarray = precip_data_array.x.values
+    y_coords: np.ndarray = precip_data_array.y.values
+    i = -1
+    for t in range(precip_data_array.shape[0]):
+        for y in range(precip_data_array.shape[1]):
+            for x in range(precip_data_array.shape[2]):
+                i += 1 # Flat index for the lead_time_values lists
+                # Gather values for all lead times at this point
+                point_values = [lt_values[i] for lt_values in lead_time_values]
+                # Check if all values should be skipped
+                if all([v is None or np.isnan(v) or isclose(v, 0.0, atol=1e-6) for v in point_values]):
+                    continue
+                # If not skipped, add the values to the dict
+                for lt, v in zip(lead_times, point_values):
+                    values_dict[lt].append(v)
+                # Add the geometry for this point
+                x_coord = x_coords[x]
+                y_coord = y_coords[y]
+                geom = get_simple_point_geometry(
+                    x_coord=x_coord,
+                    y_coord=y_coord,
+                    baseWidth=1000,
+                    scaleX=scaleX,
+                    scaleY=scaleY,
+                )
+                geometries.append(geom)
+    t3 = perf_counter()
+    tlog(f"Processing data into geometries and values took {t3 - t2:.2f} seconds")
+    # Reproject the geometries using the transformer
+    geometries = reproject_points_2d(transformer, geometries)
+    t4 = perf_counter()
+    tlog(f"Reprojecting geometries took {t4 - t3:.2f} seconds")
+    if do_timing_logs:
+        tlog(f"Total time for _get_timesteps_data_for_frontend: {t4 - t0:.2f} seconds")
+    return values_dict, geometries
 
 if __name__ == "__main__":
     import time

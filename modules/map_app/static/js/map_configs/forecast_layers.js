@@ -233,23 +233,7 @@ if (show_gridlines) {
     });
 }
 
-
-// Function to update the forecasted precipitation overlay with received data
-var receivedData = null;
-function updateForecastLayer(data) {
-    if (typeof data === 'string') {
-        data = JSON.parse(data); // Ensure data is parsed correctly
-    }
-    receivedData = data;
-    // // Data is an object that contains a 2D list of points and a 2D list of values
-    // const points = data["points"];
-    // Swapped the 2D list of points and values for 1D lists of geometries and their values
-    const geoms = data["geometries"];
-    const values = data["values"];
-    // const minValue = Math.min(...values.flat());
-    // const maxValue = Math.max(...values.flat());
-    const minValue = Math.min(...values);
-    const maxValue = Math.max(...values);
+function applyGradientColorsToFeatureCollection(featureCollection, minValue, maxValue) {
     const color = (value) => {
         if (value === minValue || Math.abs(value - minValue) < 1e-6) {
             return "rgba(0, 0, 0, 0)"; // Transparent
@@ -261,6 +245,156 @@ function updateForecastLayer(data) {
         const a = Math.sqrt(ratio); // Adjust alpha for better visibility
         return `rgba(${r}, ${g}, 0, ${a})`; // Green to red gradient
     }
+    featureCollection.features.forEach(f => {
+        f.properties.color = color(f.properties.value);
+    });
+}
+
+function applyNOAAThresholdToValue(value_inches, alpha=1.0) {
+    // Rainfall (inches)
+    // Greater than or equal to 10 
+    // rgb(215, 215, 215); // very light gray
+    // 8 to 10
+    // rgb(114, 64, 214); // purple
+    // 6 to 8
+    // rgb(246, 0, 242); // magenta
+    // 5 to 6
+    // rgb(112, 2, 9); // dark red
+    // 4 to 5
+    // rgb(162, 3, 17); // red
+    // 3 to 4
+    // rgb(245, 7, 25); // bright red
+    // 2.5 to 3
+    // rgb(246, 140, 40); // orange
+    // 2 to 2.5
+    // rgb(253, 212, 105); // yellow-orange
+    // 1.5 to 2
+    // rgb(248, 250, 61); // yellow
+    // 1 to 1.5
+    // rgb(14, 89, 24); // darkish-green
+    // 0.75 to 1
+    // rgb(24, 150, 36); // green
+    // 0.5 to 0.75
+    // rgb(40, 250, 59); // light-green
+    // 0.25 to 0.5
+    // rgb(12, 18, 135); // dark-blue
+    // 0.1 to 0.25
+    // rgb(59, 121, 187); // lightish-blue
+    // 0.01 to 0.1
+    // rgb(43, 192, 245); // very-light-blue or cyan
+    // Missing data
+    // rgb(114, 114, 114); // gray
+    var thresholds = [
+        { min: 10, color: `rgba(215, 215, 215, ${alpha})`}, // very light gray
+        { min: 8, color: `rgba(114, 64, 214, ${alpha})`}, // purple
+        { min: 6, color: `rgba(246, 0, 242, ${alpha})`}, // magenta
+        { min: 5, color: `rgba(112, 2, 9, ${alpha})`}, // dark red
+        { min: 4, color: `rgba(162, 3, 17, ${alpha})`}, // red
+        { min: 3, color: `rgba(245, 7, 25, ${alpha})`}, // bright red
+        { min: 2.5, color: `rgba(246, 140, 40, ${alpha})`}, // orange
+        { min: 2, color: `rgba(253, 212, 105, ${alpha})`}, // yellow-orange
+        { min: 1.5, color: `rgba(248, 250, 61, ${alpha})`}, // yellow
+        { min: 1, color: `rgba(14, 89, 24, ${alpha})`}, // darkish-green
+        { min: 0.75, color: `rgba(24, 150, 36, ${alpha})`}, // green
+        { min: 0.5, color: `rgba(40, 250, 59, ${alpha})`}, // light-green
+        { min: 0.25, color: `rgba(12, 18, 135, ${alpha})`}, // dark-blue
+        { min: 0.1, color: `rgba(59, 121, 187, ${alpha})`}, // lightish-blue
+        { min: 0.01, color: `rgba(43, 192, 245, ${alpha})`}, // very-light-blue or cyan
+    ];
+    var error_color = `rgba(114, 114, 114, ${alpha})`;
+    // If value is NaN or undefined, return error color
+    if (value_inches === null || value_inches === undefined || isNaN(value_inches)) {
+        return error_color;
+    }
+    // Iterate through thresholds from highest to lowest
+    for (let threshold of thresholds) {
+        if (value_inches >= threshold.min) {
+            return threshold.color;
+        }
+    }
+    // Past the last threshold, scale down the alpha based on distance from the lowest threshold
+    var lowestThreshold = thresholds[thresholds.length - 1].min;
+    var lowestThresholdColor = thresholds[thresholds.length - 1].color;
+    if (value_inches > 0 && value_inches < lowestThreshold) {
+        var scale = value_inches / lowestThreshold; // Scale from 0 to 1
+        // Extract the RGB values from the color string
+        var rgb = lowestThresholdColor.match(/\d+/g);
+        var r = parseInt(rgb[0]);
+        var g = parseInt(rgb[1]);
+        var b = parseInt(rgb[2]);
+        var scaledAlpha = alpha * scale; // Scale the alpha
+        return `rgba(${r}, ${g}, ${b}, ${scaledAlpha})`;
+    }
+    // If value is 0 or negative, return error color
+    
+    return error_color;
+}
+
+function applyColorsToFeatureCollection(featureCollection) {
+    // const method = 'gradient';
+    const method = 'thresholds';
+    if (method === 'gradient') {
+        // Use previous method of coloring based on value compared to min and max
+        var values = featureCollection.features.map(f => f.properties.value);
+        const minValue = Math.min(...values);
+        const maxValue = Math.max(...values);
+        applyGradientColorsToFeatureCollection(featureCollection, minValue, maxValue);
+    } else if (method === 'thresholds') {
+        const alpha = 1.0;
+        // Try to use fixed thresholds seen in noaa's precipitation map
+        // Values begin as kg/m^2/s, convert to inches using water's density of ~1000 kg/m^3
+        // 1 kg/m^2 = 1 mm of water
+        // 1 mm = 0.0393701 inches
+        // depending on what this results in, we may need to convert to /hr instead of /s
+        const convertToInches = (value_kg_m2_s) => {
+            return value_kg_m2_s * 0.0393701 * 3600; // Convert to inches per hour
+        };
+        featureCollection.features.forEach(f => {
+            const value_inches = convertToInches(f.properties.value);
+            f.properties.color = applyNOAAThresholdToValue(value_inches, alpha);
+            f.properties.value_inches = value_inches; // Store the converted value for reference
+        });
+    }
+}
+
+// Function to update the forecasted precipitation overlay with received data
+var receivedData = null;
+const allowHandlingMultiTimestep = false; 
+// Logic is not finished yet, so if false, we ignore timesteps past the first if more than one is received
+function updateForecastLayer(data) {
+    if (typeof data === 'string') {
+        data = JSON.parse(data); // Ensure data is parsed correctly
+    }
+    receivedData = data;
+
+    if (!allowHandlingMultiTimestep && data["timestep_values"]) {
+        // timestep_values is a dict of {timestep: [values]}
+        // We want to only take the first timestep and its values
+        var timesteps = Object.keys(data["timestep_values"]);
+        // Sort timesteps numerically
+        timesteps.sort((a, b) => parseInt(a) - parseInt(b));
+        var firstTimestep = timesteps[0];
+        console.log('Received multiple timesteps, only using the first one:', firstTimestep);
+        data["values"] = data["timestep_values"][firstTimestep];
+    }
+    // Swapped the 2D list of points and values for 1D lists of geometries and their values
+    const geoms = data["geometries"];
+    const values = data["values"];
+    // const minValue = Math.min(...values.flat());
+    // const maxValue = Math.max(...values.flat());
+    // const minValue = Math.min(...values);
+    // const maxValue = Math.max(...values);
+    // const color = (value) => {
+    //     if (value === minValue || Math.abs(value - minValue) < 1e-6) {
+    //         return "rgba(0, 0, 0, 0)"; // Transparent
+    //     }
+    //     // Map the value to a color based on a gradient
+    //     const ratio = (value - minValue) / (maxValue - minValue);
+    //     const g = Math.floor(255 * (1 - ratio));
+    //     const r = Math.floor(255 * ratio);
+    //     const a = Math.sqrt(ratio); // Adjust alpha for better visibility
+    //     return `rgba(${r}, ${g}, 0, ${a})`; // Green to red gradient
+    // }
     // For each point, create a polygon feature using the neighboring points
     var features = [];
     for (let i = 0; i < geoms.length; i++) {
@@ -286,17 +420,20 @@ function updateForecastLayer(data) {
                 ]]
             },
             properties: {
-                color: color(value),
+                color: "rgba(0, 0, 0, 0)", // Temporary, will be set later
                 value: value,
                 center: [centerX, centerY] // Add center point for popup
             }
         });
     }
-    // Update the source data
-    map.getSource("forecasted_precip").setData({
+    var featureCollection = {
         type: "FeatureCollection",
         features: features
-    });
+    };
+    // Apply colors to the features based on their values
+    applyColorsToFeatureCollection(featureCollection);
+    // Update the source data
+    map.getSource("forecasted_precip").setData(featureCollection);
     console.log('Forecasted precipitation overlay updated with data:', data);
 }
 
@@ -317,6 +454,8 @@ function updateForecastedPrecipOverlay() {
     const rowMax = local_cache["rowMax"];
     const colMin = local_cache["colMin"];
     const colMax = local_cache["colMax"];
+    const lead_time_end = local_cache["lead_time_end"];
+    const range_mode = local_cache["range_mode"];
     return requestForecastedPrecip(
         targetTime,
         leadTime,
@@ -326,7 +465,9 @@ function updateForecastedPrecipOverlay() {
         rowMin,
         rowMax,
         colMin,
-        colMax
+        colMax,
+        lead_time_end,
+        range_mode
     ).then(data => {
         if (data) {
             // Update the map overlay with the received data
@@ -346,6 +487,7 @@ function updateForecastedPrecipOverlay() {
 // Set up geometry popups for RAINRATE values
 map.on("click", "forecasted_precip_layer", (e) => {
     const value = e.features[0].properties.value;
+    const value_inches = e.features[0].properties.value_inches;
     const coordinates = e.features[0].geometry.coordinates[0][0];
     // Use the center point for the popup
     const center = JSON.parse(e.features[0].properties.center);
@@ -353,7 +495,7 @@ map.on("click", "forecasted_precip_layer", (e) => {
     // Create a popup at the center of the polygon with the value
     new maplibregl.Popup()
         .setLngLat(center)
-        .setHTML(`RAINRATE: ${value} kg/m^2/s`)
+        .setHTML(`RAINRATE:<br>${value} kg/m^2/s<br>${value_inches.toFixed(3)} in/hr`)
         .addTo(map);
     console.log('Clicked on forecasted precipitation layer at', coordinates, 'with value', value);
 });

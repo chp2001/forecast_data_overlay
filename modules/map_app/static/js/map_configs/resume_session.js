@@ -5,21 +5,6 @@ function updateWithResumedSession(data) {
         console.error('No data received for resumed session.');
         return;
     }
-    // if (data.selected_time) {
-    //     var selectedTime = data.selected_time;
-    //     // Received value is YYYYMMDD, convert it to YYYY-MM-DDTHH:MM
-    //     selectedTime = selectedTime.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3T00:00');
-    //     document.getElementById('selected-time').textContent = selectedTime;
-    //     document.getElementById('target-time').value = selectedTime;
-    // }
-    // if (data.lead_time) {
-    //     document.getElementById('selected-lead-time').textContent = data.lead_time;
-    //     document.getElementById('lead-time').value = data.lead_time;
-    // }
-    // if (data.forecast_cycle) {
-    //     document.getElementById('selected-forecast-cycle').textContent = data.forecast_cycle;
-    //     document.getElementById('forecast-cycle').value = data.forecast_cycle;
-    // }
     // Update time config using the new component
     if (data.selected_time || data.lead_time || data.forecast_cycle) {
         var timeConfigArgs = {};
@@ -72,17 +57,35 @@ function updateWithResumedSession(data) {
             data.colMin, data.colMax
         )
     }
+    function truncPrintArray(arr, maxLen=3) {
+        if (arr.length > maxLen) {
+            return arr.slice(0, maxLen).concat(['... (truncated from ' + arr.length + ' total)']);
+        }
+        return arr;
+    }
     if (data.forecasted_forcing_data_dict) {
         var data_forcing_dict = JSON.parse(data.forecasted_forcing_data_dict);
-        var geoms_for_print = data_forcing_dict['geometries'];
-        if (geoms_for_print.length > 3) {
-            geoms_for_print = geoms_for_print.slice(0, 3);
-            geoms_for_print.push('... (truncated from ' + data_forcing_dict['geometries'].length + ' total)');
-        }
-        var values_for_print = data_forcing_dict['values'];
-        if (values_for_print.length > 3) {
-            values_for_print = values_for_print.slice(0, 3);
-            values_for_print.push('... (truncated from ' + data_forcing_dict['values'].length + ' total)');
+        // var geoms_for_print = data_forcing_dict['geometries'];
+        // if (geoms_for_print.length > 3) {
+        //     geoms_for_print = geoms_for_print.slice(0, 3);
+        //     geoms_for_print.push('... (truncated from ' + data_forcing_dict['geometries'].length + ' total)');
+        // }
+        var geoms_for_print = truncPrintArray(data_forcing_dict['geometries'], 3);
+        if ('values' in data_forcing_dict) {
+            // var values_for_print = data_forcing_dict['values'];
+            // if (values_for_print.length > 3) {
+            //     values_for_print = values_for_print.slice(0, 3);
+            //     values_for_print.push('... (truncated from ' + data_forcing_dict['values'].length + ' total)');
+            // }
+            var values_for_print = truncPrintArray(data_forcing_dict['values'], 3);
+        } else if ('timestep_values' in data_forcing_dict) {
+            // has structure like {3: [1, 2, ...], 6: [...], ...}
+            var values_for_print = [];
+            for (const [timestep, vals] of Object.entries(data_forcing_dict['timestep_values'])) {
+                var vals_for_print = truncPrintArray(vals, 3);
+                values_for_print.push(`Timestep ${timestep}: ${vals_for_print}`);
+            }
+            values_for_print = truncPrintArray(values_for_print, 3); // In case there are many timesteps
         }
         console.log('Resuming session with geometries:', geoms_for_print);
         console.log('Resuming session with values:', values_for_print);

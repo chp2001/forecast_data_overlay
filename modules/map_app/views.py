@@ -24,6 +24,8 @@ from forecasting_data.forcing_datasets import (
     get_point_geometry,
     get_simple_point_geometry,
     load_forecasted_forcing_with_options,
+    get_timestep_data_for_frontend,
+    get_timesteps_data_for_frontend
 )
 
 from time import perf_counter
@@ -207,16 +209,19 @@ def get_forecast_precip():
     request_data = {}
     if request.data:
         request_data = json.loads(request.data.decode("utf-8"))
+    logger.info(f"Received request data: {request_data}")
     # Also, try to enforce standardized keys on the intra_module_db and request_data
-    selected_time = request_data.get("selected_time")
-    forecast_cycle = request_data.get("forecast_cycle")
-    lead_time = request_data.get("lead_time")
-    scaleX = int(request_data.get("scaleX"))
-    scaleY = int(request_data.get("scaleY"))
-    rowMin = request_data.get("rowMin")
-    rowMax = request_data.get("rowMax")
-    colMin = request_data.get("colMin")
-    colMax = request_data.get("colMax")
+    selected_time = request_data.get("selected_time") # str like YYYYMMDD
+    forecast_cycle = request_data.get("forecast_cycle") # int like 0, 6, 12, 18
+    lead_time = request_data.get("lead_time") # int like 0, 1, ..., 18, ..., 384
+    scaleX = int(request_data.get("scaleX")) # int like 1, 2, 4, ..., 64
+    scaleY = int(request_data.get("scaleY")) # int like 1, 2, 4, ..., 64
+    rowMin = request_data.get("rowMin") # int like 0, 16, 32, ..., 3840
+    rowMax = request_data.get("rowMax") # int like 0, 16, 32, ..., 3840
+    colMin = request_data.get("colMin") # int like 0, 16, 32, ..., 4608
+    colMax = request_data.get("colMax") # int like 0, 16, 32, ..., 4608
+    lead_time_end = request_data.get("lead_time_end") # int like 0, 1, ..., 18, ..., 384
+    range_mode = request_data.get("range_mode") # bool like True or False
     intable_args = {  # Reformat for use in `load_forecasted_forcing_with_options`
         "fcst_cycle": forecast_cycle,
         "lead_time": lead_time,
@@ -226,6 +231,7 @@ def get_forecast_precip():
         "rowMax": rowMax,
         "colMin": colMin,
         "colMax": colMax,
+        "lead_time_end": lead_time_end,
     }
     t1 = perf_counter()  # After reading request data / intra_module_db
     if t1 - t0 > 1.0:
@@ -251,12 +257,6 @@ def get_forecast_precip():
     if any(v is not None for v in [rowMin, rowMax, colMin, colMax]) and not all(
         v is not None for v in [rowMin, rowMax, colMin, colMax]
     ):
-        # return jsonify(
-        #     {
-        #         "error": f"Missing required fields for region bounds: "
-        #         f"{', '.join([k for k, v in [('rowMin', rowMin), ('rowMax', rowMax), ('colMin', colMin), ('colMax', colMax)] if v is None])}"
-        #     }
-        # ), 400
         violation = "Missing required fields for region bounds: "
         missing = [
             name
@@ -281,56 +281,47 @@ def get_forecast_precip():
     if t2 - t1 > 1.0:
         print(f"Validating request data took {t2 - t1:.2f} seconds")
     intable_args = {k: int(v) if v is not None else None for k, v in intable_args.items()}
-
-    precip_data_array, transformer = load_forecasted_forcing_with_options(
-        date=selected_time,
-        **intable_args,
+    if range_mode is None:
+        range_mode = False
+    # Combine args for passing to data loading functions
+    all_args = intable_args.copy()
+    all_args.update(
+        {
+            "selected_time": selected_time,
+            "range_mode": range_mode,
+        }
     )
-    precip_data_array_np = precip_data_array.to_numpy()
-
-    t3 = perf_counter()  # After data loading
-    if t3 - t2 > 1.0:
-        print(f"Loading forecasted forcing took {t3 - t2:.2f} seconds")
-    print(f"Finished loading data at {t3 - t0:.2f} seconds since start")
-    if precip_data_array is None:
-        return jsonify({"error": "Failed to load forecasted precipitation data"}), 500
-    data_dict = {
-        "geometries": [],
-        "values": [],
-    }
-    # At this stage, time axis is not eliminated, but is very likely to be length 1
-    geoms = []
-    values = []
-    processed_data_points = 0
-    for t in range(precip_data_array.shape[0]):
-        for y in range(precip_data_array.shape[1]):
-            for x in range(precip_data_array.shape[2]):
-                if processed_data_points == 0:
-                    processed_data_points += 1
-                    print(
-                        f"Processing first data point at {perf_counter() - t0:.2f} seconds since start"
-                    )
-                value = precip_data_array_np[t, y, x]
-                if isnan(value) or isclose(value, 0.0, atol=1e-6):
-                    continue
-                x_coord = precip_data_array.x[x].item()
-                y_coord = precip_data_array.y[y].item()
-                # Get the geometry for the point
-                geom = get_simple_point_geometry(
-                    x_coord, y_coord, baseWidth=1000, scaleX=scaleX, scaleY=scaleY
-                )
-                if len(geoms) == 0:
-                    print(
-                        f"Adding first geometry at {perf_counter() - t0:.2f} seconds since start"
-                    )
-                geoms.append(geom)
-                values.append(value)
-    reprojected_geoms = reproject_points_2d(transformer, geoms)
-    data_dict["geometries"] = reprojected_geoms
-    data_dict["values"] = values
-    t4 = perf_counter()  # After data processing
-    if t4 - t3 > 1.0:
-        print(f"Processing data took {t4 - t3:.2f} seconds")
+    if not range_mode:
+        # No range of lead times, single timestep only
+        data_dict = get_timestep_data_for_frontend(
+            selected_time=selected_time,
+            **intable_args,
+        )
+        t3 = perf_counter()  # After data loading
+        t4 = perf_counter()  # After data processing (Both handled inside function)
+        if t3 - t2 > 1.0:
+            print(f"Loading forecasted forcing took {t3 - t2:.2f} seconds")
+    elif lead_time_end is not None and lead_time_end > lead_time:
+        targeted_lead_times = list(range(lead_time, lead_time_end + 1))
+        timestep_values, geometries = get_timesteps_data_for_frontend(
+            selected_time=selected_time,
+            lead_times=targeted_lead_times,
+            **intable_args,
+        )
+        data_dict = {
+            "timestep_values": timestep_values,
+            "geometries": geometries,
+        }
+        t3 = perf_counter()  # After data loading
+        t4 = perf_counter()  # After data processing (Both handled inside function)
+        if t3 - t2 > 1.0:
+            print(f"Loading {len(targeted_lead_times)} timesteps took {t3 - t2:.2f} seconds")
+    else:
+        # ???? How does one even get here ? 
+        # Throw an error/warning to catch the attention of the user/developer
+        logger.warning(f"Reached branch unexpectedly with args: {all_args}")
+        raise Exception(f"Reached branch unexpectedly with args: {all_args}")
+        return jsonify({"error": "Invalid lead_time_end for range mode"}), 400
     print(f"Processed data at {t4 - t0:.2f} seconds since start")
     # Save to intra_module_db for potential session resumption
     intra_module_db["forecasted_forcing_data_dict"] = data_dict
@@ -343,6 +334,8 @@ def get_forecast_precip():
     intra_module_db["rowMax"] = rowMax
     intra_module_db["colMin"] = colMin
     intra_module_db["colMax"] = colMax
+    intra_module_db["lead_time_end"] = lead_time_end
+    intra_module_db["range_mode"] = range_mode
     t5 = perf_counter()  # After saving to intra_module_db
     if t5 - t4 > 1.0:
         print(f"Saving to intra_module_db took {t5 - t4:.2f} seconds")
@@ -411,6 +404,8 @@ def tryget_resume_session():
             "regionRowMax": intra_module_db.get("regionRowMax", 3840),
             "regionColMin": intra_module_db.get("regionColMin", 0),
             "regionColMax": intra_module_db.get("regionColMax", 4608),
+            "lead_time_end": intra_module_db.get("lead_time_end"),
+            "range_mode": intra_module_db.get("range_mode", False),
         }
         logger.info("Resuming session with data: %s", result_dict)
         result_dict["forecasted_forcing_data_dict"] = data_json

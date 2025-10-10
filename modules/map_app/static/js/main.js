@@ -135,7 +135,9 @@ var local_cache = {
     scaleY: 16,
     target_time: null,
     lead_time: null,
-    forecast_cycle: null
+    forecast_cycle: null,
+    lead_time_end: null,
+    range_mode: null
 };
 
 /**
@@ -150,7 +152,9 @@ function requestForecastedPrecip(
     rowMin = null,
     rowMax = null,
     colMin = null,
-    colMax = null
+    colMax = null,
+    lead_time_end = null,
+    range_mode = null
 ) {
     if (scaleX === null) {
         scaleX = 16;
@@ -167,23 +171,15 @@ function requestForecastedPrecip(
         rowMin: rowMin,
         rowMax: rowMax,
         colMin: colMin,
-        colMax: colMax
+        colMax: colMax,
+        lead_time_end: lead_time_end,
+        range_mode: range_mode
     }
     console.log('Requesting forecasted precipitation with args:', arg_body);
     return fetch('/get_forecast_precip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            selected_time: selected_time,
-            lead_time: lead_time,
-            forecast_cycle: forecast_cycle,
-            scaleX: scaleX,
-            scaleY: scaleY,
-            rowMin: rowMin,
-            rowMax: rowMax,
-            colMin: colMin,
-            colMax: colMax
-        }),
+        body: JSON.stringify(arg_body),
     })
         .then(response => {
             if (!response.ok) {
