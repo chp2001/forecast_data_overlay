@@ -357,11 +357,78 @@ function applyColorsToFeatureCollection(featureCollection) {
     }
 }
 
+function applyValuesToFeatureCollection(featureCollection, values) {
+    // Assume values and features are the same length and in the same order
+    for (let i = 0; i < featureCollection.features.length; i++) {
+        featureCollection.features[i].properties.value = values[i];
+    }
+}
+
+/**
+ * Build a GeoJSON FeatureCollection from an array of geometries
+ * Each geometry is an array of four points that form a rectangle
+ * @param {Array} geometry - Array of geometries, each geometry is an array of four [x, y] points
+ * @returns {Object} GeoJSON FeatureCollection
+ */
+function buildFeatureCollection(geometry) {
+    var features = [];
+    for (let i = 0; i < geometry.length; i++) {
+        const geom = geometry[i];
+        // The geometry is a list of four points that form a rectangle
+        if (geom.length < 4) {
+            console.warn('Geometry has less than 4 points, skipping:', geom);
+            continue; // Skip geometries that don't have enough points
+        }
+        const centerX = (geom[0][0] + geom[2][0]) / 2;
+        const centerY = (geom[0][1] + geom[2][1]) / 2;
+        features.push({
+            type: "Feature",
+            geometry: {
+                type: "Polygon",
+                coordinates: [[
+                    [geom[0][0], geom[0][1]],
+                    [geom[1][0], geom[1][1]],
+                    [geom[2][0], geom[2][1]],
+                    [geom[3][0], geom[3][1]],
+                    [geom[0][0], geom[0][1]], // Close the polygon
+                ]]
+            },
+            properties: {
+                color: "rgba(0, 0, 0, 0)", // Temporary, will be set later
+                value: 0.0, // Temporary, will be set later
+                center: [centerX, centerY] // Add center point for popup
+            }
+        });
+    }
+    var featureCollection = {
+        type: "FeatureCollection",
+        features: features
+    };
+    return featureCollection;
+}
+
+/**
+ * Update a GeoJSON FeatureCollection with new values for a specific timestep
+ * by pulling the values from data_cache.timestep_values
+ * @param {Object} featureCollection - GeoJSON FeatureCollection to update
+ * @param {number} timestep - Timestep to use for updating values
+ */
+function updateFeatureCollectionWithTimeStep(featureCollection, timestep) {
+    if (!(timestep in data_cache.timestep_values)) {
+        console.warn('Timestep not found in data_cache:', timestep);
+        return;
+    }
+    const values = data_cache.timestep_values[timestep];
+    applyValuesToFeatureCollection(featureCollection, values);
+    applyColorsToFeatureCollection(featureCollection);
+}
+
+
 // Function to update the forecasted precipitation overlay with received data
 var receivedData = null;
 const allowHandlingMultiTimestep = false; 
 // Logic is not finished yet, so if false, we ignore timesteps past the first if more than one is received
-function updateForecastLayer(data) {
+function updateForecastLayer_old(data) {
     if (typeof data === 'string') {
         data = JSON.parse(data); // Ensure data is parsed correctly
     }
@@ -380,21 +447,6 @@ function updateForecastLayer(data) {
     // Swapped the 2D list of points and values for 1D lists of geometries and their values
     const geoms = data["geometries"];
     const values = data["values"];
-    // const minValue = Math.min(...values.flat());
-    // const maxValue = Math.max(...values.flat());
-    // const minValue = Math.min(...values);
-    // const maxValue = Math.max(...values);
-    // const color = (value) => {
-    //     if (value === minValue || Math.abs(value - minValue) < 1e-6) {
-    //         return "rgba(0, 0, 0, 0)"; // Transparent
-    //     }
-    //     // Map the value to a color based on a gradient
-    //     const ratio = (value - minValue) / (maxValue - minValue);
-    //     const g = Math.floor(255 * (1 - ratio));
-    //     const r = Math.floor(255 * ratio);
-    //     const a = Math.sqrt(ratio); // Adjust alpha for better visibility
-    //     return `rgba(${r}, ${g}, 0, ${a})`; // Green to red gradient
-    // }
     // For each point, create a polygon feature using the neighboring points
     var features = [];
     for (let i = 0; i < geoms.length; i++) {
@@ -421,7 +473,7 @@ function updateForecastLayer(data) {
             },
             properties: {
                 color: "rgba(0, 0, 0, 0)", // Temporary, will be set later
-                value: value,
+                value: 0.0, // Temporary, will be set later
                 center: [centerX, centerY] // Add center point for popup
             }
         });
@@ -432,6 +484,27 @@ function updateForecastLayer(data) {
     };
     // Apply colors to the features based on their values
     applyColorsToFeatureCollection(featureCollection);
+    // Update the source data
+    map.getSource("forecasted_precip").setData(featureCollection);
+    console.log('Forecasted precipitation overlay updated with data:', data);
+}
+
+function updateForecastLayer(data) {
+    // Assume data is already parsed correctly
+    receivedData = data;
+
+    var featureCollection = buildFeatureCollection(data["geometries"]);
+    var values = null;
+    if (data["timestep_values"]) {
+        // If format is {timestep: [values]}, we initialize with the cached lead_time values
+        // values = data["timestep_values"][local_cache["lead_time"]];
+        updateFeatureCollectionWithTimeStep(featureCollection, local_cache["lead_time"]);
+    } else {
+        values = data["values"];
+        applyValuesToFeatureCollection(featureCollection, values);
+        // Apply colors to the features based on their values
+        applyColorsToFeatureCollection(featureCollection);
+    }
     // Update the source data
     map.getSource("forecasted_precip").setData(featureCollection);
     console.log('Forecasted precipitation overlay updated with data:', data);
@@ -470,6 +543,18 @@ function updateForecastedPrecipOverlay() {
         range_mode
     ).then(data => {
         if (data) {
+            // Update data_cache
+            data_cache.geometry = data["geometries"];
+            if (data["timestep_values"]) {
+                // If multiple time steps were received, store them all
+                data_cache.timestep_values = data["timestep_values"];
+            } else {
+                // If only one time step received, store it under the leadTime key
+                data_cache.timestep_values = {
+                    leadTime: data["values"]
+                };
+            }
+
             // Update the map overlay with the received data
             updateForecastLayer(data);
             // We were successful, return true
@@ -499,3 +584,16 @@ map.on("click", "forecasted_precip_layer", (e) => {
         .addTo(map);
     console.log('Clicked on forecasted precipitation layer at', coordinates, 'with value', value);
 });
+
+// RANGE SLIDER RELEVANT CODE
+// Set up interactivity with the time_config_element's prototype
+// range slider for adjusting the displayed data
+timeConfigElement.onRangeSliderChangeFuncs['forecast_layers'] = (selectedLeadTime) => {
+    console.log('Range slider changed, displaying data from new lead time:', selectedLeadTime);
+    // Pull the data from the map's source data
+    var featureCollection = map.getSource("forecasted_precip")._data;
+    // Update the feature collection with the new lead time's values
+    updateFeatureCollectionWithTimeStep(featureCollection, selectedLeadTime);
+    // Update the source data to refresh the map
+    map.getSource("forecasted_precip").setData(featureCollection);
+}

@@ -13,18 +13,23 @@ function updateWithResumedSession(data) {
             // Received value is YYYYMMDD, convert it to YYYY-MM-DD
             selectedTime = selectedTime.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
             timeConfigArgs['target_time'] = selectedTime;
+            local_cache['target_time'] = data.selected_time; // keep in YYYYMMDD format for requests
         }
         if (data.lead_time != null) {
             timeConfigArgs['lead_time'] = data.lead_time;
+            local_cache['lead_time'] = data.lead_time;
         }
         if (data.forecast_cycle != null) {
             timeConfigArgs['forecast_cycle'] = data.forecast_cycle;
+            local_cache['forecast_cycle'] = data.forecast_cycle;
         }
         if (data.range_mode != null) {
             timeConfigArgs['range_mode'] = data.range_mode;
+            local_cache['range_mode'] = data.range_mode;
         }
         if (data.lead_time_end != null) {
             timeConfigArgs['lead_time_end'] = data.lead_time_end;
+            local_cache['lead_time_end'] = data.lead_time_end;
         }
         console.log('Resuming session with time config args:', timeConfigArgs);
         timeConfigElement.externallySetFull(timeConfigArgs);
@@ -90,6 +95,17 @@ function updateWithResumedSession(data) {
         console.log('Resuming session with geometries:', geoms_for_print);
         console.log('Resuming session with values:', values_for_print);
         // updateForecastLayer(data.forecasted_forcing_data_dict);
+        // Update data_cache
+        data_cache.geometry = data_forcing_dict["geometries"];
+        if (data_forcing_dict["timestep_values"]) {
+            // If multiple time steps were received, store them all
+            data_cache.timestep_values = data_forcing_dict["timestep_values"];
+        } else {
+            // If only one time step received, store it under the leadTime key
+            data_cache.timestep_values = {
+                leadTime: data_forcing_dict["values"]
+            };
+        }
         updateForecastLayer(data_forcing_dict);
     }
     // If there are any other session data to resume, handle them here

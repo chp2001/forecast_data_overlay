@@ -141,6 +141,14 @@ var local_cache = {
 };
 
 /**
+ * @type {{geometry: Array, timestep_values: Object.<number, Array>}}
+ */
+var data_cache = {
+    geometry: [],
+    timestep_values: {},
+}
+
+/**
  * Generalized function to request forecasted precipitation data from the server.
  */
 function requestForecastedPrecip(

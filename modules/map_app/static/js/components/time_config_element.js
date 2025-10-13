@@ -73,7 +73,7 @@ var time_config_config = {
     selected_lead_times_label_string: 'Selected Lead Times (range): ',
     selected_forecast_cycle_label_string: 'Selected Forecast Cycle: ',
     // const submit_button_string = 'Set Time';
-    submit_button_string: 'Submit',
+    submit_button_string: 'Get Data',
     submit_button_id: 'submit-time-config',
 }
 
@@ -89,6 +89,11 @@ var time_config_config = {
 /**
  * @callback onSubmitCallback
  * @param {timeConfigArgs} args - The arguments passed to the callback
+ */
+// RANGE SLIDER RELEVANT CODE
+/**
+ * @callback onRangeSliderChangeCallback
+ * @param {number} selectedLeadTime - The currently selected lead time
  */
 
 /**
@@ -171,6 +176,24 @@ class time_config extends HTMLElement {
         this.submitButton = null;
         // container element for the entire component
         this.containerElement = null;
+
+        // RANGE SLIDER RELEVANT CODE
+        this.showRangeSlider = false; // Enable/disable additional slider based on whether
+        // range mode is enabled and lead time < lead time end, allowing for a range of lead times
+        // to be selected for time series/animation mode.
+        this.rangeSliderContainer = null; // Container for the range slider, shown/hidden based on showRangeSlider
+        this.rangeSliderMinLabel = null; // Label for the minimum lead time in range slider
+        this.rangeSliderMaxLabel = null; // Label for the maximum lead time in range slider
+        this.rangeSliderValueLabel = null; // Label showing the current value of the range slider
+        this.rangeSliderElement = null; // The range slider element itself
+
+        /**
+         * This is a temporary solution for now, and won't have proper infrastructure until
+         * later.
+         * @type {Object.<string, onRangeSliderChangeCallback>}
+         */
+        this.onRangeSliderChangeFuncs = {};
+
 
         this.uuid = time_config.id++;
     }
@@ -271,6 +294,7 @@ class time_config extends HTMLElement {
         } else if (mode === true) {
             this.range_mode = true;
             this.leadTimeEndContainer.style.display = 'flex';
+            this.rangeModeElement.checked = true;
             // Lead time end becoming visible, to ensure validity
             // just set it to the current lead time value.
             // This means the range being enabled does not
@@ -279,6 +303,7 @@ class time_config extends HTMLElement {
         } else if (mode === false) {
             this.range_mode = false;
             this.leadTimeEndContainer.style.display = 'none';
+            this.rangeModeElement.checked = false;
         } else {
             console.error('Invalid range mode value: ' + mode);
             return;
@@ -303,6 +328,9 @@ class time_config extends HTMLElement {
         }
         // this.selectedForecastCycleElement.textContent = this.selected_forecast_cycle || 'None';
         this.selectedForecastCycleElement.textContent = (this.selected_forecast_cycle !== null) ? this.selected_forecast_cycle : 'None';
+        // RANGE SLIDER RELEVANT CODE
+        this.checkRangeSliderVisibility();
+        this.updateRangeSliderSegment();
     }
 
     /**
@@ -348,6 +376,49 @@ class time_config extends HTMLElement {
     externallySetFull({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null}={}) {
         this.externallySetPreviousValues({target_time, lead_time, forecast_cycle, range_mode, lead_time_end});
         this.externallySetInputValues({target_time, lead_time, forecast_cycle, range_mode, lead_time_end});
+    }
+
+    /**
+     * Check whether the range slider should be shown or hidden, and update the relevant property.
+     */
+    checkRangeSliderVisibility() {
+        // RANGE SLIDER RELEVANT CODE
+        // Check only the 'selected_' properties, as these represent the last submitted values.
+        if ([this.selected_range_mode, this.selected_lead_time, this.selected_lead_time_end].includes(null)) {
+            this.showRangeSlider = false;
+            return;
+        }
+        if (this.selected_range_mode === true && this.selected_lead_time < this.selected_lead_time_end) {
+            this.showRangeSlider = true;
+        } else {
+            this.showRangeSlider = false;
+        }
+    }
+
+    /**
+     * Update the range slider segment to display the current range.
+     */
+    updateRangeSliderSegment() {
+        // RANGE SLIDER RELEVANT CODE
+        if (!this.showRangeSlider) {
+            this.rangeSliderContainer.style.display = 'none';
+            return;
+        }
+        this.rangeSliderContainer.style.display = 'flex';
+        // this.rangeSliderMinLabel.textContent = this.lead_time;
+        // this.rangeSliderMaxLabel.textContent = this.lead_time_end;
+        // this.rangeSliderElement.min = this.lead_time;
+        // this.rangeSliderElement.max = this.lead_time_end;
+        // this.rangeSliderElement.step = this.data_step_lead_time;
+        // this.rangeSliderElement.value = this.lead_time; // By default, always starts at the first value
+        // this.rangeSliderValueLabel.textContent = this.lead_time;
+        this.rangeSliderMinLabel.textContent = this.selected_lead_time;
+        this.rangeSliderMaxLabel.textContent = this.selected_lead_time_end;
+        this.rangeSliderElement.min = this.selected_lead_time;
+        this.rangeSliderElement.max = this.selected_lead_time_end;
+        this.rangeSliderElement.step = this.data_step_lead_time;
+        this.rangeSliderElement.value = this.selected_lead_time; // By default, always starts at the first value
+        this.rangeSliderValueLabel.textContent = this.selected_lead_time;
     }
 
     /**
@@ -619,6 +690,83 @@ class time_config extends HTMLElement {
     }
 
     /**
+     * Build the range slider segment of the component.
+     * Separate segment below the submit button, only visible when range mode is enabled
+     * and lead time < lead time end.
+     * @returns {HTMLDivElement} The range slider segment element
+     */
+    buildRangeSliderSegment() {
+        // RANGE SLIDER RELEVANT CODE
+        // Range slider for selecting a specific lead time within the selected range
+        // Only visible when range mode is enabled and lead time < lead time end
+
+        // Initialize values to nulls, will be set in updateRangeSliderSegment()
+        this.showRangeSlider = false;
+        this.rangeSliderContainer = document.createElement('div');
+        this.rangeSliderContainer.className = 'range-slider-container';
+        this.rangeSliderContainer.style.display = 'none'; // Hidden by default
+
+        const rangeSliderLabel = document.createElement('label');
+        rangeSliderLabel.textContent = 'Select Lead Time for Display:';
+        rangeSliderLabel.style.alignSelf = 'center';
+        
+        this.rangeSliderElement = document.createElement('input');
+        this.rangeSliderElement.type = 'range';
+        this.rangeSliderElement.id = 'lead-time-range-slider';
+        this.rangeSliderElement.name = 'lead-time-range-slider';
+        this.rangeSliderElement.min = 0;
+        this.rangeSliderElement.max = 1;
+        this.rangeSliderElement.step = 1;
+        this.rangeSliderElement.value = 0;
+
+        this.rangeSliderMinLabel = document.createElement('span');
+        this.rangeSliderMinLabel.id = 'lead-time-range-slider-min';
+        this.rangeSliderMinLabel.textContent = '';
+
+        this.rangeSliderMaxLabel = document.createElement('span');
+        this.rangeSliderMaxLabel.id = 'lead-time-range-slider-max';
+        this.rangeSliderMaxLabel.textContent = '';
+
+        this.rangeSliderValueLabel = document.createElement('span');
+        this.rangeSliderValueLabel.id = 'lead-time-range-slider-value';
+        this.rangeSliderValueLabel.textContent = '';
+
+        const rangeSliderSelectorContainer = document.createElement('div');
+        rangeSliderSelectorContainer.style.display = 'flex';
+        rangeSliderSelectorContainer.style.alignItems = 'center';
+        // rangeSliderSelectorContainer.style.marginLeft = '10px';
+        rangeSliderSelectorContainer.appendChild(this.rangeSliderMinLabel);
+        rangeSliderSelectorContainer.appendChild(this.rangeSliderElement);
+        rangeSliderSelectorContainer.appendChild(this.rangeSliderMaxLabel);
+
+        const rangeSliderValueContainer = document.createElement('div');
+        rangeSliderValueContainer.style.display = 'flex';
+        rangeSliderValueContainer.style.alignItems = 'center';
+        rangeSliderValueContainer.appendChild(document.createTextNode(' Current: '));
+        rangeSliderValueContainer.appendChild(this.rangeSliderValueLabel);
+        
+        this.rangeSliderContainer.style.flexDirection = 'column';
+        this.rangeSliderContainer.style.alignItems = 'center';
+        this.rangeSliderContainer.style.marginTop = '10px';
+        this.rangeSliderContainer.style.outline = '1px solid #ccc';
+        this.rangeSliderContainer.style.padding = '3px';
+        this.rangeSliderContainer.appendChild(rangeSliderLabel);
+        this.rangeSliderContainer.appendChild(rangeSliderSelectorContainer);
+        this.rangeSliderContainer.appendChild(rangeSliderValueContainer);
+
+        // Tiny disclaimer at bottom explaining that the slider is only
+        // visible when the current data contains multiple lead times
+        const rangeSliderDisclaimerText = 'Note: This slider is only visible when the currently loaded data contains multiple lead times.';
+        const rangeSliderDisclaimer = document.createElement('div');
+        rangeSliderDisclaimer.textContent = rangeSliderDisclaimerText;
+        rangeSliderDisclaimer.style.fontSize = '0.8em';
+        rangeSliderDisclaimer.style.fontStyle = 'italic';
+        this.rangeSliderContainer.appendChild(rangeSliderDisclaimer);
+
+        return this.rangeSliderContainer;
+    }
+
+    /**
      * Configure the range mode toggle events
      */
     configureRangeModeToggle() {
@@ -712,6 +860,29 @@ class time_config extends HTMLElement {
     }
 
     /**
+     * Configure the range slider events
+     */
+    configureRangeSlider() {
+        this.rangeSliderElement.addEventListener('input', (event) => {
+            const value = parseInt(event.target.value);
+            this.rangeSliderValueLabel.textContent = value;
+            // Call any registered onRangeSliderChange functions
+            for (const key in this.onRangeSliderChangeFuncs) {
+                this.onRangeSliderChangeFuncs[key](value);
+            }
+        });
+        // this.addOnSubmitFunction('tryUpdateRangeSlider', (args) => {
+        //     // Show the range slider if in range mode and lead time < lead time end
+        //     if (args.range_mode === true && args.lead_time < args.lead_time_end) {
+        //         this.showRangeSlider = true;
+        //     } else {
+        //         this.showRangeSlider = false;
+        //     }
+        //     this.updateRangeSliderSegment();
+        // });
+    }
+
+    /**
      * Build the entire component structure and append it to the custom element
      */
     build() {
@@ -753,12 +924,18 @@ class time_config extends HTMLElement {
 
         this.containerElement.appendChild(this.titleElement);
         this.containerElement.appendChild(targetTimeContainer);
+        this.containerElement.appendChild(forecastCycleContainer);
         this.containerElement.appendChild(rangeModeContainer);
         this.containerElement.appendChild(leadTimeContainer);
         this.containerElement.appendChild(leadTimeEndContainer);
-        this.containerElement.appendChild(forecastCycleContainer);
+        
         this.containerElement.appendChild(selectedValuesContainer);
         this.containerElement.appendChild(submitButtonContainer);
+        
+        // RANGE SLIDER RELEVANT CODE
+        const rangeSliderContainer = this.buildRangeSliderSegment();
+        this.containerElement.appendChild(rangeSliderContainer);
+        this.configureRangeSlider();
 
         // Append the container to the component
         this.appendChild(this.containerElement);
