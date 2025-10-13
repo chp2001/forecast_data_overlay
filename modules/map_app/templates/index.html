@@ -18,7 +18,7 @@
 <body>
     <!-- <script src="{{ url_for('static', filename='js/components/double_labeled_slider.js' ) }}"></script> -->
     <!-- Use jinja templating to load all of the files in js/components/ -->
-    <p>{{components_filenames}}</p>
+    <!-- <p>{{components_filenames}}</p> -->
     {% for filename in components_filenames %}
     <script src="{{ url_for('static', filename='js/components/' + filename) }}"></script>
     {% endfor %}
