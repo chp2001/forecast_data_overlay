@@ -1,321 +1,171 @@
+/**
+ * @file Functionality for the region selection configuration interface.
+ * @author chp2001 <https://github.com/chp2001>
+ */
 
-// Set up the #region-col-selection and #region-row-selection interface elements
-function setupMinMaxSliders(parentDivId) {
-    // Create the min and max sliders and their labels
-    // then return the created elements
-    const parentDiv = document.getElementById(parentDivId);
+/** @const {Boolean} - Whether to enable debug logging. Set to true to enable debug logs, false to disable.*/
+const region_config_debug = false;
 
-    // Create min label
-    const minLabel = document.createElement("label");
-    minLabel.for = `${parentDivId}-min`;
-    minLabel.innerText = "Min:";
-    minLabel.style.width = "40px"; // fixed width for alignment
-
-    // Create min slider
-    const minSlider = document.createElement("input");
-    minSlider.type = "range";
-    minSlider.id = `${parentDivId}-min`;
-    minSlider.name = `${parentDivId}-min`;
-    minSlider.step = "1";
-    // leave the sliders unconfigured for now
-
-    const minSliderCurrentValue = document.createElement("span");
-    minSliderCurrentValue.id = `${parentDivId}-min-current-value`;
-    minSliderCurrentValue.style.width = "30px";
-    minSliderCurrentValue.innerText = "";
-
-    const minSliderSetValue = document.createElement("span");
-    minSliderSetValue.id = `${parentDivId}-min-set-value`;
-    minSliderSetValue.style.width = "30px";
-    minSliderSetValue.innerText = "";
-
-    
-
-    
-
-    // Create min container div for horizontal arrangement
-    const minContainer = document.createElement("div");
-    minContainer.style.display = "flex";
-    minContainer.style.alignItems = "center";
-    minContainer.style.gap = "10px"; // space between label and slider
-    minContainer.appendChild(minLabel);
-    minContainer.appendChild(minSlider);
-    minContainer.appendChild(minSliderCurrentValue);
-    minContainer.appendChild(minSliderSetValue);
-
-    parentDiv.appendChild(minContainer);
-
-    // Create max label
-    const maxLabel = document.createElement("label");
-    maxLabel.for = `${parentDivId}-max`;
-    maxLabel.innerText = "Max:";
-    maxLabel.style.width = "40px"; // fixed width for alignment
-
-    // Create max slider
-    const maxSlider = document.createElement("input");
-    maxSlider.type = "range";
-    maxSlider.id = `${parentDivId}-max`;
-    maxSlider.name = `${parentDivId}-max`;
-    maxSlider.step = "1";
-    // leave the sliders unconfigured for now
-
-    const maxSliderCurrentValue = document.createElement("span");
-    maxSliderCurrentValue.id = `${parentDivId}-max-current-value`;
-    maxSliderCurrentValue.style.width = "30px";
-    maxSliderCurrentValue.innerText = "";
-
-    const maxSliderSetValue = document.createElement("span");
-    maxSliderSetValue.id = `${parentDivId}-max-set-value`;
-    maxSliderSetValue.style.width = "30px";
-    maxSliderSetValue.innerText = "";
-
-    // Functions to modify the behavior of the sliders
-
-    const minValueSelector = (targetValue) => {
-        if (targetValue < parseInt(minSlider.min)) {
-            targetValue = parseInt(minSlider.min);
-        }
-        if (targetValue >= parseInt(maxSlider.value)) {
-            targetValue = parseInt(maxSlider.value) - 1;
-        }
-        minSlider.value = targetValue;
-        minSliderCurrentValue.innerText = targetValue;
-    } // Logic for limiting the selected value, can be used externally if needed
-
-    const maxValueSelector = (targetValue) => {
-        if (targetValue > parseInt(maxSlider.max)) {
-            targetValue = parseInt(maxSlider.max);
-        }
-        if (targetValue <= parseInt(minSlider.value)) {
-            targetValue = parseInt(minSlider.value) + 1;
-        }
-        maxSlider.value = targetValue;
-        maxSliderCurrentValue.innerText = targetValue;
-    } // Logic for limiting the selected value, can be used externally if needed
-
-    const minValueSetter = () => {
-        minSliderSetValue.innerText = minSlider.value;
-    }; // To be returned and used externally with the "Set Region" button
-
-    const minValueSetterExternal = (value) => {
-        minValueSelector(value);
-        minValueSetter();
-    }; // To be used when resuming a session or otherwise externally
-
-    const maxValueSetter = () => {
-        maxSliderSetValue.innerText = maxSlider.value;
-    }; // To be returned and used externally with the "Set Region" button
-
-    const maxValueSetterExternal = (value) => {
-        maxValueSelector(value);
-        maxValueSetter();
-    }; // To be used when resuming a session or otherwise externally
-
-    // Configure the input listeners
-    minSlider.addEventListener("input", (event) => {
-        minValueSelector(event.target.value);
-    });
-    maxSlider.addEventListener("input", (event) => {
-        maxValueSelector(event.target.value);
-    });
-    // Create max container div for horizontal arrangement
-    const maxContainer = document.createElement("div");
-    maxContainer.style.display = "flex";
-    maxContainer.style.alignItems = "center";
-    maxContainer.style.gap = "10px"; // space between label and slider
-    maxContainer.appendChild(maxLabel);
-    maxContainer.appendChild(maxSlider);
-    maxContainer.appendChild(maxSliderCurrentValue);
-    maxContainer.appendChild(maxSliderSetValue);
-
-    parentDiv.appendChild(maxContainer);
-
-    return {
-        minSlider,
-        minSliderCurrentValue,
-        minSliderSetValue,
-        minValueSelector,
-        minValueSetter,
-        minValueSetterExternal,
-        maxSlider,
-        maxSliderCurrentValue,
-        maxSliderSetValue,
-        maxValueSelector,
-        maxValueSetter,
-        maxValueSetterExternal,
-    };
+/**
+ * Logs messages to the console if region_config_debug is true.
+ * Intended only for use within this file.
+ * @param  {...any} args - The messages or objects to log to the console.
+ */
+function r_c_d_log(...args) {
+    if (region_config_debug) {
+        console.log("[region_config]", ...args);
+    }
 }
 
-const rowElements = setupMinMaxSliders("region-row-selection");
-const colElements = setupMinMaxSliders("region-col-selection");
-
-
-function updateSetValues() {
-    rowElements.minValueSetter();
-    rowElements.maxValueSetter();
-    colElements.minValueSetter();
-    colElements.maxValueSetter();
+// New method using the region-selector component
+/**
+ * @type {region_selector}
+ */
+const regionSelectorElement = document.getElementById('region-selector');
+if (!regionSelectorElement) {
+    throw new Error('Region selector element not found');
 }
-
-function getSelectedRegion() {
-    return {
-        rowMin: parseInt(rowElements.minSliderSetValue.innerText),
-        rowMax: parseInt(rowElements.maxSliderSetValue.innerText),
-        colMin: parseInt(colElements.minSliderSetValue.innerText),
-        colMax: parseInt(colElements.maxSliderSetValue.innerText),
-    };
-}
-
 
 // Store the target region bounds globally for access when fetching data
-var targetRegionBounds = { rowMin: null, rowMax: null, colMin: null, colMax: null };
+var targetRegionBounds = {
+    rowMin: regionSelectorElement.rowMinSetValue,
+    rowMax: regionSelectorElement.rowMaxSetValue,
+    colMin: regionSelectorElement.colMinSetValue,
+    colMax: regionSelectorElement.colMaxSetValue
+}
 // Store the properties of the region sliders for use when they change due to other actions
 var regionProperties = {
-    minimumRow: null,
-    maximumRow: null,
-    stepRow: 1,
-    minimumCol: null,
-    maximumCol: null,
-    stepCol: 1,
+    minimumRow: regionSelectorElement.yMinSlider.min,
+    maximumRow: regionSelectorElement.yMaxSlider.max,
+    stepRow: regionSelectorElement.yMinSlider.step,
+    minimumCol: regionSelectorElement.xMinSlider.min,
+    maximumCol: regionSelectorElement.xMaxSlider.max,
+    stepCol: regionSelectorElement.xMinSlider.step,
 }
-
+function updateRegionProperties() {
+    // Update the regionProperties object
+    regionProperties.minimumRow = regionSelectorElement.yMinSlider.min;
+    regionProperties.maximumRow = regionSelectorElement.yMaxSlider.max;
+    regionProperties.stepRow = regionSelectorElement.yMinSlider.step;
+    regionProperties.minimumCol = regionSelectorElement.xMinSlider.min;
+    regionProperties.maximumCol = regionSelectorElement.xMaxSlider.max;
+    regionProperties.stepCol = regionSelectorElement.xMinSlider.step;
+}
+function updateTargetRegionBounds() {
+    targetRegionBounds.rowMin = regionSelectorElement.rowMinSetValue;
+    targetRegionBounds.rowMax = regionSelectorElement.rowMaxSetValue;
+    targetRegionBounds.colMin = regionSelectorElement.colMinSetValue;
+    targetRegionBounds.colMax = regionSelectorElement.colMaxSetValue;
+}
+// Translating the sendSelectedRegion function
 function sendSelectedRegion() {
-    const region = getSelectedRegion();
-    var send_object = { ...region};
-    // Include the region slider properties as well
-    send_object["regionRowMin"] = regionProperties.minimumRow;
-    send_object["regionRowMax"] = regionProperties.maximumRow;
-    send_object["regionColMin"] = regionProperties.minimumCol;
-    send_object["regionColMax"] = regionProperties.maximumCol;
-    console.log("Sending selected region to server:", send_object);
-    fetch('/set_region_bounds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(region),
-    })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Region bounds sent to server:', region);
-            console.log('Server response:', data);
-        })
-        .catch(error => {
-            console.error('Error sending region bounds to server:', error);
-        }
-    );
+    // Just saves relevant values to local_cache for use when fetching data
+    local_cache["colMin"] = regionSelectorElement.colMinSetValue;
+    local_cache["colMax"] = regionSelectorElement.colMaxSetValue;
+    local_cache["rowMin"] = regionSelectorElement.rowMinSetValue;
+    local_cache["rowMax"] = regionSelectorElement.rowMaxSetValue;
+    local_cache["regionRowMin"] = regionProperties.minimumRow;
+    local_cache["regionRowMax"] = regionProperties.maximumRow;
+    local_cache["regionColMin"] = regionProperties.minimumCol;
+    local_cache["regionColMax"] = regionProperties.maximumCol;
+    r_c_d_log("Saved selected region to local cache:", local_cache);
 }
-
-
-function setSliderProperties(sliderElements, min, max, step) {
-    // Set the slider properties
-    sliderElements.minSlider.min = min;
-    sliderElements.minSlider.max = max;
-    sliderElements.minSlider.step = step;
-    sliderElements.maxSlider.min = min;
-    sliderElements.maxSlider.max = max;
-    sliderElements.maxSlider.step = step;
-    // If there are existing values, we will want to shift them to the nearest step
-    const currentMin = sliderElements.minSliderSetValue.innerText;
-    const currentMax = sliderElements.maxSliderSetValue.innerText;
-    // Adjust existing values to be within new min/max and aligned to step
-    if (currentMin != "") {
-        console.log("Current min value:", currentMin);
-        let currentMinValue = parseInt(currentMin);
-        if (currentMinValue < min) {
-            sliderElements.minSlider.value = min;
-        } else if (currentMinValue > max) {
-            sliderElements.minSlider.value = max;
-        } else {
-            let roundedMin = Math.round((currentMinValue - min) / step) * step + min;
-            sliderElements.minSlider.value = roundedMin;
-        }
-    } else {
-        console.log("No current min value, setting to min:", min);
-        sliderElements.minSlider.value = min;
-    }
-    if (currentMax != "") {
-        console.log("Current max value:", currentMax);
-        let currentMaxValue = parseInt(currentMax);
-        if (currentMaxValue < min) {
-            sliderElements.maxSlider.value = min;
-        } else if (currentMaxValue > max) {
-            sliderElements.maxSlider.value = max;
-        } else {
-            let roundedMax = Math.round((currentMaxValue - min) / step) * step + min;
-            sliderElements.maxSlider.value = roundedMax;
-        }
-    } else {
-        console.log("No current max value, setting to max:", max);
-        sliderElements.maxSlider.value = max;
-    }
-    
-
-    // Update the displayed current and set values
-    sliderElements.minSliderCurrentValue.innerText = sliderElements.minSlider.value;
-    sliderElements.minSliderSetValue.innerText = sliderElements.minSlider.value;
-    sliderElements.maxSliderCurrentValue.innerText = sliderElements.maxSlider.value;
-    sliderElements.maxSliderSetValue.innerText = sliderElements.maxSlider.value;
-}
-
+// Translating the setRegionCallbacks functionality
 var setRegionCallbacks = [];
 function callSetRegion() {
     setRegionCallbacks.forEach((callback) => {
         callback();
     });
 }
-
+var selectRegionCallbacks = [];
+function callSelectRegion(rowMin, rowMax, colMin, colMax) {
+    selectRegionCallbacks.forEach((callback) => {
+        callback(rowMin, rowMax, colMin, colMax);
+    });
+}
+// Translating the externalSetRegionBounds function
 function externalSetRegionBounds(rowMin, rowMax, colMin, colMax, rowStep, colStep) {
-    // Force steps to be 16 always
-    // rowStep = 16;
-    // colStep = 16;
-    console.log("Externally setting region sliders to:", { rowMin, rowMax, colMin, colMax, rowStep, colStep });
-    setSliderProperties(rowElements, rowMin, rowMax, rowStep);
-    setSliderProperties(colElements, colMin, colMax, colStep);
+    regionSelectorElement.setSliderBounds({
+        rowMin: rowMin,
+        rowMax: rowMax,
+        colMin: colMin,
+        colMax: colMax,
+    });
     // Update the regionProperties object
-    regionProperties.minimumRow = rowMin;
-    regionProperties.maximumRow = rowMax;
-    regionProperties.stepRow = rowStep;
-    regionProperties.minimumCol = colMin;
-    regionProperties.maximumCol = colMax;
-    regionProperties.stepCol = colStep;
-    // Update the targetRegionBounds to match the new slider values
-    targetRegionBounds = getSelectedRegion();
+    updateRegionProperties();
     callSetRegion();
-    console.log("Region sliders externally set. Target region bounds now:", targetRegionBounds);
+    // rowStep and colStep are not currently set up to be easily changed externally...
+    if (rowStep !== undefined && rowStep !== 16) {
+        // Fail loudly to get dev attention
+        throw new Error("Non-default rowStep provided to externalSetRegionBounds, but changing rowStep is not currently supported: " + rowStep);
+    }
+    if (colStep !== undefined && colStep !== 16) {
+        // Fail loudly to get dev attention
+        throw new Error("Non-default colStep provided to externalSetRegionBounds, but changing colStep is not currently supported: " + colStep);
+    }
+    r_c_d_log("Region sliders externally set. Target region properties now:", regionProperties);
 }
-
+// Translating the externalSetRegionValues function
 function externalSetRegionValues(rowMin, rowMax, colMin, colMax) {
-    console.log("Externally setting region slider values to:", { rowMin, rowMax, colMin, colMax });
-    // Adjust the values and setValues to the provided values
-    rowElements.minValueSetterExternal(rowMin);
-    rowElements.maxValueSetterExternal(rowMax);
-    colElements.minValueSetterExternal(colMin);
-    colElements.maxValueSetterExternal(colMax);
-    targetRegionBounds = getSelectedRegion();
-    console.log("Region slider values externally set. Target region bounds now:", targetRegionBounds);
+    // Triggers both the set and select functions of the component
+    regionSelectorElement.setFull({
+        rowMin: rowMin,
+        rowMax: rowMax,
+        colMin: colMin,
+        colMax: colMax
+    });
+    updateTargetRegionBounds();
+    callSetRegion();
+    r_c_d_log("Region slider values externally set. Target region bounds now:", targetRegionBounds);
 }
 
+// Callbacks for when the sliders are adjusted without setting them
+regionSelectorElement.addOnRegionSelectionFunction(
+    'region-config-selection-update', 
+    ({rowMin = null, rowMax = null, colMin = null, colMax = null}={}) =>
+    {
+        // Send the selected region to the callbacks
+        callSelectRegion(
+            regionSelectorElement.rowMinSelectionValue,
+            regionSelectorElement.rowMaxSelectionValue,
+            regionSelectorElement.colMinSelectionValue,
+            regionSelectorElement.colMaxSelectionValue
+        )
+    }
+);
+// Callbacks for when the values are locked in
+regionSelectorElement.addOnRegionSetFunction(
+    'region-config-set-update',
+    ({rowMin = null, rowMax = null, colMin = null, colMax = null}={}) =>
+    {
+        updateRegionProperties();
+        updateTargetRegionBounds();
+        sendSelectedRegion();
+        callSetRegion();
+    }
+);
 
+// externalSetRegionBounds(
+//     0, 3840,
+//     0, 4608,
+//     16, 16
+// );
+// externalSetRegionValues(656, 1264, 1952, 2416);
 
-// When the "Set Region" button is clicked, we update the targetRegionBounds
-document.getElementById("set-region").addEventListener("click", () => {
-    updateSetValues();
-    targetRegionBounds = getSelectedRegion();
-    callSetRegion();
-    sendSelectedRegion();
-    console.log("Target region bounds set to:", targetRegionBounds);
-});
+// function finalizeRegionConfig() {
+    // Need to set up callback etc after the component is ready
 
-externalSetRegionBounds(
-    0, 3840,
-    0, 4608,
-    16, 16
-)
-// colElements.minValueSetterExternal(1952);
-// colElements.maxValueSetterExternal(2416);
-// rowElements.minValueSetterExternal(656);
-// rowElements.maxValueSetterExternal(1264);
+    
 externalSetRegionValues(656, 1264, 1952, 2416);
-// on load, send the initial region to the server
+
+sendSelectedRegion();
+// }
+// map.on('load', () => {
+//     finalizeRegionConfig();
+// });
+// document.addEventListener('DOMContentLoaded', () => {
+//     finalizeRegionConfig();
+// });
 map.on('load', () => {
     sendSelectedRegion();
 });

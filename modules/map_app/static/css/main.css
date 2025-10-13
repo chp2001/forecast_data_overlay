@@ -139,11 +139,12 @@ button:hover {
   background-color: var(--primary-hover);
 }
 
-#time-settings, #scale-settings {
+#time-settings, #scale-settings, #region-settings {
   background: var(--surface-color);
   padding: 20px;
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
 }
 
 .time-input {
@@ -336,7 +337,7 @@ input[type="datetime-local"] {
 #options-panel.expanded {
     /* width: 200px; */
     min-width: 200px;
-    max-width: 300px;
+    /* max-width: 300px; */
     /* height: 475px; */
     max-height: max(55vh, 500px);
     min-height: 450px;
@@ -356,6 +357,7 @@ input[type="datetime-local"] {
     font-size: 20px;
     cursor: pointer;
     padding: 5px;
+    color: var(--text-color);
 }
 
 #options-content {
@@ -365,4 +367,10 @@ input[type="datetime-local"] {
 
 #options-panel.expanded #options-content {
     display: block;
+}
+
+#toggle-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }

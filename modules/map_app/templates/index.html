@@ -16,19 +16,23 @@
 </head>
 
 <body>
+    <!-- <script src="{{ url_for('static', filename='js/components/double_labeled_slider.js' ) }}"></script> -->
+    <!-- Use jinja templating to load all of the files in js/components/ -->
+    <!-- <p>{{components_filenames}}</p> -->
+    {% for filename in components_filenames %}
+    <script src="{{ url_for('static', filename='js/components/' + filename) }}"></script>
+    {% endfor %}
+
+    <!-- <double-labeled-slider label="test-slider" id="test-slider"></double-labeled-slider> -->
+    <!-- <script src="{{ url_for('static', filename='js/map_configs/scale_config_2.js' ) }}"></script> -->
+    <!-- <scale-config></scale-config> -->
+    <!-- <region-selector id="region-selector"></region-selector> -->
+    <!-- <time-config id="time-config"></time-config> -->
     <!-- <header>
         <h1>Select catchments by clicking!</h1>
     </header> -->
-
     <main>
         <section id="map-container">
-            <!-- <div id="map">
-                <button id="toggle-button-gages">Show gages</button>
-                <button id="toggle-button-camels">Show CAMELS basins</button>
-                <button id="toggle-button-nwm">Overlay NWM chunks</button>
-                <button id="toggle-button-aorc">Overlay AORC chunks</button>
-                <button id="toggle-button-forecast">Show Forecast Data</button>
-            </div> -->
             <button id="toggle-panel-button" aria-label="Toggle Options Panel">☰</button>
             <div id="options-panel" class="minimized">
                 <div id="panel-spacer" style="height: 20px;"></div>
@@ -40,122 +44,16 @@
                         <button id="toggle-button-aorc">Overlay AORC chunks</button>
                         <button id="toggle-button-forecast">Show Forecast Data</button>
                     </div>
-                    <section id="scale-settings">
-                        <!-- 
-                        Controls for modifying the granularity of the displayed data
-                        E.g., by default the grid is coarsened such that groups of 16x16 cells are summed together
-                        This section allows the user to modify that coarsening factor
-                        xarray allows coarsening by x and y separately, so we can allow both to be modified
-                        -->
-                        <label for="scale-settings">Data Scale Settings:</label>
-                        <div class="scale-axis-lock-toggle">
-                            <input type="checkbox" id="scale-axis-lock" name="scale-axis-lock" checked>
-                            <label for="scale-axis-lock">Lock X and Y axis scaling</label>
-                        </div>
-                        <script>
-                            function updateYScale(value) {
-                                const yScaleInput = document.getElementById('scale-y');
-                                yScaleInput.value = value;
-                                document.getElementById('scale-y-value').textContent = value;
-                            }
-                            function updateXScale(value) {
-                                const xScaleInput = document.getElementById('scale-x');
-                                xScaleInput.value = value;
-                                document.getElementById('scale-x-value').textContent = value;
-                            }
-                            document.getElementById('scale-axis-lock').addEventListener('change', function () {
-                                if (this.checked) {
-                                    // If locking is enabled, set both to the max of the two
-                                    const maxScale = Math.max(parseInt(document.getElementById('scale-x').value), parseInt(document.getElementById('scale-y').value));
-                                    updateXScale(maxScale);
-                                    updateYScale(maxScale);
-                                }
-                            });
-                        </script>
-                        <div class="scale-x-input">
-                            <label for="scale-x">X Scale (size of summed blocks in x direction):</label>
-                            <input type="range" id="scale-x" name="scale-x" value="16" min="1" max="64" step="1">
-                            <span id="scale-x-value">16</span>
-                            <!-- Currently set value: -->
-                            <span id="set-scale-x-value">16</span>
-                            <script>
-                                updateXScale(document.getElementById('scale-x').value);
-                                document.getElementById('scale-x').addEventListener('input', function () {
-                                    updateXScale(this.value);
-                                    if (document.getElementById('scale-axis-lock').checked) {
-                                        updateYScale(this.value);
-                                    }
-                                });
-                            </script>
-                        </div>
-                        <div class="scale-y-input">
-                            <label for="scale-y">Y Scale (size of summed blocks in y direction):</label>
-                            <input type="range" id="scale-y" name="scale-y" value="16" min="1" max="64" step="1">
-                            <span id="scale-y-value">16</span>
-                            <!-- Currently set value: -->
-                            <span id="set-scale-y-value">16</span>
-                            <script>
-                                updateYScale(document.getElementById('scale-y').value);
-                                document.getElementById('scale-y').addEventListener('input', function () {
-                                    updateYScale(this.value);
-                                    if (document.getElementById('scale-axis-lock').checked) {
-                                        updateXScale(this.value);
-                                    }
-                                });
-                            </script>
-                        </div>
-                        <!-- Button to apply the selected scale settings. Will update the displayed values, and re-request data with the new scale -->
-                        <button id="set-scale">Set Scale</button>
-                    </section>
-                    <div id="region-selection">
+                    <scale-config id="scale-config"></scale-config>
+                    <!-- <div id="region-selection">
                         <label for="region-selection">Region Selection:</label>
-                        <!-- Use sliders to select specific region of map for data access -->
                         <div id="region-col-selection"></div>
                         <div id="region-row-selection"></div>
                         <button id="set-region">Set Region</button>
-                    </div>
-                    <section id="time-settings">
-                        <label for="time-settings">Time Settings:</label>
-                        <div class="time-input" style="display: flex; flex-direction: column; margin-bottom: 10px;">
-                            <label for="target-time">Target Time:</label>
-                            <input type="datetime-local" id="target-time" name="target-time" value="2018-09-17T00:00"
-                                min="2018-09-17T00:00">
-                        </div>
-                        <div class="lead-time-input">
-                            <label for="lead-time">Lead Time (hours):</label>
-                            <input type="range" id="lead-time" name="lead-time" value="1" min="1" max="18" step="1">
-                            <span id="lead-time-value">1</span>
-                            <script>
-                                document.getElementById('lead-time-value').textContent = document.getElementById('lead-time').value;
-                                document.getElementById('lead-time').addEventListener('input', function () {
-                                    document.getElementById('lead-time-value').textContent = this.value;
-                                });
-                            </script>
-                        </div>
-                        <div class="forecast-cycle-input">
-                            <label for="forecast-cycle">Forecast Cycle:</label>
-                            <input type="range" id="forecast-cycle" name="forecast-cycle" value="0" min="0" max="23"
-                                step="1">
-                            <span id="forecast-cycle-value">0</span>
-                            <script>
-                                document.getElementById('forecast-cycle-value').textContent = document.getElementById('forecast-cycle').value;
-                                document.getElementById('forecast-cycle').addEventListener('input', function () {
-                                    document.getElementById('forecast-cycle-value').textContent = this.value;
-                                });
-                            </script>
-                        </div>
-                        <div class="selected-values" style="outline: 1px solid #ccc; padding: 3px; margin-top: 10px;">
-                            <!--Display the values as they were when the `set-time` button was last pressed-->
-                            <!--The user must press the button for this section to be populated-->
-                            <p>Selected Time: <span id="selected-time">None</span></p>
-                            <p>Selected Lead Time: <span id="selected-lead-time">None</span></p>
-                            <p>Selected Forecast Cycle: <span id="selected-forecast-cycle">None</span></p>
-                        </div>
-                        <button id="set-time">Set Time</button>
-                    </section>
-
+                    </div> -->
+                    <region-selector id="region-selector"></region-selector>
+                    <time-config id="time-config"></time-config>
                 </div>
-
             </div>
             <script>
                 document.getElementById('toggle-panel-button').addEventListener('click', function () {
@@ -182,6 +80,9 @@
     <script src="{{ url_for('static', filename='js/console.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/data_processing.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js' ) }}"></script>
+    <!-- Leaving these manual... Trying to dynamically load them causes problems -->
+    <script src="{{ url_for('static', filename='js/map_configs/scale_config.js' ) }}"></script>
+    <script src="{{ url_for('static', filename='js/map_configs/time_config.js' ) }}"></script>
     <script src="{{ url_for('static', filename='js/map_configs/basic_layers.js' ) }}"></script>
     <script src="{{ url_for('static', filename='js/map_configs/region_config.js' ) }}"></script>
     <script src="{{ url_for('static', filename='js/map_configs/forecast_layers.js' ) }}"></script>
