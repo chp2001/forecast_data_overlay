@@ -64,6 +64,12 @@ var time_config_config = {
     lead_time_default: 1,
     lead_time_end_label_string: 'Lead Time End:',
     lead_time_end_element_id: 'lead-time-end-input',
+    // lead time / lead time end coupling behavior:
+    // choose between:
+    // 1. constrain: disallow movement of one past the other
+    // 2. propagate: moving one past the other moves the other as well
+    // lead_time_end_coupling: 'constrain',
+    lead_time_end_coupling: 'propagate',
     forecast_cycle_label_string: 'Forecast Cycle:',
     forecast_cycle_element_id: 'forecast-cycle-input',
     forecast_cycle_default: 0,
@@ -405,13 +411,6 @@ class time_config extends HTMLElement {
             return;
         }
         this.rangeSliderContainer.style.display = 'flex';
-        // this.rangeSliderMinLabel.textContent = this.lead_time;
-        // this.rangeSliderMaxLabel.textContent = this.lead_time_end;
-        // this.rangeSliderElement.min = this.lead_time;
-        // this.rangeSliderElement.max = this.lead_time_end;
-        // this.rangeSliderElement.step = this.data_step_lead_time;
-        // this.rangeSliderElement.value = this.lead_time; // By default, always starts at the first value
-        // this.rangeSliderValueLabel.textContent = this.lead_time;
         this.rangeSliderMinLabel.textContent = this.selected_lead_time;
         this.rangeSliderMaxLabel.textContent = this.selected_lead_time_end;
         this.rangeSliderElement.min = this.selected_lead_time;
@@ -779,32 +778,74 @@ class time_config extends HTMLElement {
      * Configure the lead time input events
      */
     configureLeadTimeInput() {
-        this.leadTimeElement.addEventListener('input', (event) => {
-            const value = parseInt(event.target.value);
-            if (this.range_mode && value > this.lead_time_end) {
-                // In range mode, lead time cannot exceed lead time end
-                // Cap the value to lead time end
-                this.selectLeadTime(this.lead_time_end);
-            } else {
-                this.selectLeadTime(value);
-            }
-        });
+        if (time_config_config.lead_time_end_coupling === 'constrain') {
+            // Original behavior: when lead time is changed, if it exceeds lead time end,
+            // cap it to lead time end
+            this.leadTimeElement.addEventListener('input', (event) => {
+                const value = parseInt(event.target.value);
+                if (this.range_mode && value > this.lead_time_end) {
+                    // In range mode, lead time cannot exceed lead time end
+                    // Cap the value to lead time end
+                    this.selectLeadTime(this.lead_time_end);
+                } else {
+                    this.selectLeadTime(value);
+                }
+            });
+        } else if (time_config_config.lead_time_end_coupling === 'propagate') {
+            // New behavior: when lead time is changed, if it exceeds lead time end,
+            // set lead time end to the new lead time value
+            this.leadTimeElement.addEventListener('input', (event) => {
+                const value = parseInt(event.target.value);
+                if (this.range_mode && value > this.lead_time_end) {
+                    // In range mode, lead time cannot exceed lead time end
+                    // Set lead time end to the new lead time value
+                    this.selectLeadTime(value);
+                    this.selectLeadTimeEnd(value);
+                } else {
+                    this.selectLeadTime(value);
+                }
+            });
+        } else {
+            console.error('Invalid lead_time_end_coupling configuration: ' + time_config_config.lead_time_end_coupling);
+            return;
+        }
     }
 
     /**
      * Configure the lead time end input events
      */
     configureLeadTimeEndInput() {
-        this.leadTimeEndElement.addEventListener('input', (event) => {
-            const value = parseInt(event.target.value);
-            if (value < this.lead_time) {
-                // In range mode, lead time end cannot be less than lead time
-                // Cap the value to lead time
-                this.selectLeadTimeEnd(this.lead_time);
-            } else {
-                this.selectLeadTimeEnd(value);
-            }
-        });
+        if (time_config_config.lead_time_end_coupling === 'constrain') {
+            // Original behavior: when lead time end is changed, if it is less than lead time,
+            // cap it to lead time
+            this.leadTimeEndElement.addEventListener('input', (event) => {
+                const value = parseInt(event.target.value);
+                if (value < this.lead_time) {
+                    // In range mode, lead time end cannot be less than lead time
+                    // Cap the value to lead time
+                    this.selectLeadTimeEnd(this.lead_time);
+                } else {
+                    this.selectLeadTimeEnd(value);
+                }
+            });
+        } else if (time_config_config.lead_time_end_coupling === 'propagate') {
+            // New behavior: when lead time end is changed, if it is less than lead time,
+            // set lead time to the new lead time end value
+            this.leadTimeEndElement.addEventListener('input', (event) => {
+                const value = parseInt(event.target.value);
+                if (value < this.lead_time) {
+                    // In range mode, lead time end cannot be less than lead time
+                    // Set lead time to the new lead time end value
+                    this.selectLeadTimeEnd(value);
+                    this.selectLeadTime(value);
+                } else {
+                    this.selectLeadTimeEnd(value);
+                }
+            });
+        } else {
+            console.error('Invalid lead_time_end_coupling configuration: ' + time_config_config.lead_time_end_coupling);
+            return;
+        }
     }
 
     /**
@@ -871,15 +912,6 @@ class time_config extends HTMLElement {
                 this.onRangeSliderChangeFuncs[key](value);
             }
         });
-        // this.addOnSubmitFunction('tryUpdateRangeSlider', (args) => {
-        //     // Show the range slider if in range mode and lead time < lead time end
-        //     if (args.range_mode === true && args.lead_time < args.lead_time_end) {
-        //         this.showRangeSlider = true;
-        //     } else {
-        //         this.showRangeSlider = false;
-        //     }
-        //     this.updateRangeSliderSegment();
-        // });
     }
 
     /**
