@@ -96,14 +96,10 @@ var time_config_config = {
  * @callback onSubmitCallback
  * @param {timeConfigArgs} args - The arguments passed to the callback
  */
-// RANGE SLIDER RELEVANT CODE
-/**
- * @callback onRangeSliderChangeCallback
- * @param {number} selectedLeadTime - The currently selected lead time
- */
 
 /**
- * @class time_config
+ * @class 
+ * @name time_config
  * @extends {HTMLElement}
  */
 class time_config extends HTMLElement {
@@ -121,9 +117,15 @@ class time_config extends HTMLElement {
 
         // Important interface object:
         /**
-         * @type {Object.<string, onSubmitCallback>}
+         * @type {Object.<string, onSubmitCallback>} 
+         * Functions to call when the submit button is pressed.
          */
         this.onSubmitFuncs = {};
+        /**
+         * @type {Object.<string, onSubmitCallback>}
+         * Functions to call when something updates the selection display.
+         */
+        this.onDisplaySelectFuncs = {};
 
         // Data attributes
         this.target_time = time_config_config.target_time_default_date; // expected to be '2025-07-04'
@@ -183,30 +185,11 @@ class time_config extends HTMLElement {
         // container element for the entire component
         this.containerElement = null;
 
-        // RANGE SLIDER RELEVANT CODE
-        this.showRangeSlider = false; // Enable/disable additional slider based on whether
-        // range mode is enabled and lead time < lead time end, allowing for a range of lead times
-        // to be selected for time series/animation mode.
-        this.rangeSliderContainer = null; // Container for the range slider, shown/hidden based on showRangeSlider
-        this.rangeSliderMinLabel = null; // Label for the minimum lead time in range slider
-        this.rangeSliderMaxLabel = null; // Label for the maximum lead time in range slider
-        this.rangeSliderValueLabel = null; // Label showing the current value of the range slider
-        this.rangeSliderElement = null; // The range slider element itself
-
-        /**
-         * This is a temporary solution for now, and won't have proper infrastructure until
-         * later.
-         * @type {Object.<string, onRangeSliderChangeCallback>}
-         */
-        this.onRangeSliderChangeFuncs = {};
-
-
         this.uuid = time_config.id++;
     }
 
     connectedCallback() {
         console.log('Time Config ' + this.uuid + ' triggered callback. Building...');
-
         this.build();
     }
 
@@ -244,6 +227,43 @@ class time_config extends HTMLElement {
     triggerOnSubmit(args) {
         for (const key in this.onSubmitFuncs) {
             this.onSubmitFuncs[key](args);
+        }
+    }
+
+    // onDisplaySelect function helpers
+
+    /**
+     * Add a function to be called when the selection display is updated.
+     * @param {string} key - The unique key to identify the function.
+     * @param {onSubmitCallback} func - The function to call on selection change.
+     */
+    addOnDisplaySelectFunction(key, func) {
+        if (this.onDisplaySelectFuncs[key]) {
+            console.error('Function with key ' + key + ' already exists. Use a unique key.');
+            return;
+        }
+        this.onDisplaySelectFuncs[key] = func;
+    }
+
+    /**
+     * Remove a previously added onDisplaySelect function.
+     * @param {string} key - The unique key identifying the function to remove.
+     */
+    removeOnDisplaySelectFunction(key) {
+        if (!this.onDisplaySelectFuncs[key]) {
+            console.error('Function with key ' + key + ' does not exist.');
+            return;
+        }
+        delete this.onDisplaySelectFuncs[key];
+    }
+    
+    /**
+     * Call all registered onDisplaySelect functions with the provided arguments.
+     * @param {timeConfigArgs} args - The arguments to pass to the onSelect functions.
+     */
+    triggerOnDisplaySelect(args) {
+        for (const key in this.onDisplaySelectFuncs) {
+            this.onDisplaySelectFuncs[key](args);
         }
     }
 
@@ -334,9 +354,14 @@ class time_config extends HTMLElement {
         }
         // this.selectedForecastCycleElement.textContent = this.selected_forecast_cycle || 'None';
         this.selectedForecastCycleElement.textContent = (this.selected_forecast_cycle !== null) ? this.selected_forecast_cycle : 'None';
-        // RANGE SLIDER RELEVANT CODE
-        this.checkRangeSliderVisibility();
-        this.updateRangeSliderSegment();
+        // Trigger any display select functions
+        this.triggerOnDisplaySelect({
+            target_time: this.selected_target_time,
+            lead_time: this.selected_lead_time,
+            forecast_cycle: this.selected_forecast_cycle,
+            range_mode: this.selected_range_mode,
+            lead_time_end: this.selected_lead_time_end
+        });
     }
 
     /**
@@ -382,42 +407,6 @@ class time_config extends HTMLElement {
     externallySetFull({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null}={}) {
         this.externallySetPreviousValues({target_time, lead_time, forecast_cycle, range_mode, lead_time_end});
         this.externallySetInputValues({target_time, lead_time, forecast_cycle, range_mode, lead_time_end});
-    }
-
-    /**
-     * Check whether the range slider should be shown or hidden, and update the relevant property.
-     */
-    checkRangeSliderVisibility() {
-        // RANGE SLIDER RELEVANT CODE
-        // Check only the 'selected_' properties, as these represent the last submitted values.
-        if ([this.selected_range_mode, this.selected_lead_time, this.selected_lead_time_end].includes(null)) {
-            this.showRangeSlider = false;
-            return;
-        }
-        if (this.selected_range_mode === true && this.selected_lead_time < this.selected_lead_time_end) {
-            this.showRangeSlider = true;
-        } else {
-            this.showRangeSlider = false;
-        }
-    }
-
-    /**
-     * Update the range slider segment to display the current range.
-     */
-    updateRangeSliderSegment() {
-        // RANGE SLIDER RELEVANT CODE
-        if (!this.showRangeSlider) {
-            this.rangeSliderContainer.style.display = 'none';
-            return;
-        }
-        this.rangeSliderContainer.style.display = 'flex';
-        this.rangeSliderMinLabel.textContent = this.selected_lead_time;
-        this.rangeSliderMaxLabel.textContent = this.selected_lead_time_end;
-        this.rangeSliderElement.min = this.selected_lead_time;
-        this.rangeSliderElement.max = this.selected_lead_time_end;
-        this.rangeSliderElement.step = this.data_step_lead_time;
-        this.rangeSliderElement.value = this.selected_lead_time; // By default, always starts at the first value
-        this.rangeSliderValueLabel.textContent = this.selected_lead_time;
     }
 
     /**
@@ -688,82 +677,7 @@ class time_config extends HTMLElement {
         return submitButtonContainer;
     }
 
-    /**
-     * Build the range slider segment of the component.
-     * Separate segment below the submit button, only visible when range mode is enabled
-     * and lead time < lead time end.
-     * @returns {HTMLDivElement} The range slider segment element
-     */
-    buildRangeSliderSegment() {
-        // RANGE SLIDER RELEVANT CODE
-        // Range slider for selecting a specific lead time within the selected range
-        // Only visible when range mode is enabled and lead time < lead time end
-
-        // Initialize values to nulls, will be set in updateRangeSliderSegment()
-        this.showRangeSlider = false;
-        this.rangeSliderContainer = document.createElement('div');
-        this.rangeSliderContainer.className = 'range-slider-container';
-        this.rangeSliderContainer.style.display = 'none'; // Hidden by default
-
-        const rangeSliderLabel = document.createElement('label');
-        rangeSliderLabel.textContent = 'Select Lead Time for Display:';
-        rangeSliderLabel.style.alignSelf = 'center';
-        
-        this.rangeSliderElement = document.createElement('input');
-        this.rangeSliderElement.type = 'range';
-        this.rangeSliderElement.id = 'lead-time-range-slider';
-        this.rangeSliderElement.name = 'lead-time-range-slider';
-        this.rangeSliderElement.min = 0;
-        this.rangeSliderElement.max = 1;
-        this.rangeSliderElement.step = 1;
-        this.rangeSliderElement.value = 0;
-
-        this.rangeSliderMinLabel = document.createElement('span');
-        this.rangeSliderMinLabel.id = 'lead-time-range-slider-min';
-        this.rangeSliderMinLabel.textContent = '';
-
-        this.rangeSliderMaxLabel = document.createElement('span');
-        this.rangeSliderMaxLabel.id = 'lead-time-range-slider-max';
-        this.rangeSliderMaxLabel.textContent = '';
-
-        this.rangeSliderValueLabel = document.createElement('span');
-        this.rangeSliderValueLabel.id = 'lead-time-range-slider-value';
-        this.rangeSliderValueLabel.textContent = '';
-
-        const rangeSliderSelectorContainer = document.createElement('div');
-        rangeSliderSelectorContainer.style.display = 'flex';
-        rangeSliderSelectorContainer.style.alignItems = 'center';
-        // rangeSliderSelectorContainer.style.marginLeft = '10px';
-        rangeSliderSelectorContainer.appendChild(this.rangeSliderMinLabel);
-        rangeSliderSelectorContainer.appendChild(this.rangeSliderElement);
-        rangeSliderSelectorContainer.appendChild(this.rangeSliderMaxLabel);
-
-        const rangeSliderValueContainer = document.createElement('div');
-        rangeSliderValueContainer.style.display = 'flex';
-        rangeSliderValueContainer.style.alignItems = 'center';
-        rangeSliderValueContainer.appendChild(document.createTextNode(' Current: '));
-        rangeSliderValueContainer.appendChild(this.rangeSliderValueLabel);
-        
-        this.rangeSliderContainer.style.flexDirection = 'column';
-        this.rangeSliderContainer.style.alignItems = 'center';
-        this.rangeSliderContainer.style.marginTop = '10px';
-        this.rangeSliderContainer.style.outline = '1px solid #ccc';
-        this.rangeSliderContainer.style.padding = '3px';
-        this.rangeSliderContainer.appendChild(rangeSliderLabel);
-        this.rangeSliderContainer.appendChild(rangeSliderSelectorContainer);
-        this.rangeSliderContainer.appendChild(rangeSliderValueContainer);
-
-        // Tiny disclaimer at bottom explaining that the slider is only
-        // visible when the current data contains multiple lead times
-        const rangeSliderDisclaimerText = 'Note: This slider is only visible when the currently loaded data contains multiple lead times.';
-        const rangeSliderDisclaimer = document.createElement('div');
-        rangeSliderDisclaimer.textContent = rangeSliderDisclaimerText;
-        rangeSliderDisclaimer.style.fontSize = '0.8em';
-        rangeSliderDisclaimer.style.fontStyle = 'italic';
-        this.rangeSliderContainer.appendChild(rangeSliderDisclaimer);
-
-        return this.rangeSliderContainer;
-    }
+    
 
     /**
      * Configure the range mode toggle events
@@ -901,20 +815,6 @@ class time_config extends HTMLElement {
     }
 
     /**
-     * Configure the range slider events
-     */
-    configureRangeSlider() {
-        this.rangeSliderElement.addEventListener('input', (event) => {
-            const value = parseInt(event.target.value);
-            this.rangeSliderValueLabel.textContent = value;
-            // Call any registered onRangeSliderChange functions
-            for (const key in this.onRangeSliderChangeFuncs) {
-                this.onRangeSliderChangeFuncs[key](value);
-            }
-        });
-    }
-
-    /**
      * Build the entire component structure and append it to the custom element
      */
     build() {
@@ -964,10 +864,7 @@ class time_config extends HTMLElement {
         this.containerElement.appendChild(selectedValuesContainer);
         this.containerElement.appendChild(submitButtonContainer);
         
-        // RANGE SLIDER RELEVANT CODE
-        const rangeSliderContainer = this.buildRangeSliderSegment();
-        this.containerElement.appendChild(rangeSliderContainer);
-        this.configureRangeSlider();
+        
 
         // Append the container to the component
         this.appendChild(this.containerElement);
