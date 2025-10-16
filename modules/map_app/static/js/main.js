@@ -1,4 +1,13 @@
-var colorDict = {
+/**
+ * @file File for initializing various global variables and data structures
+ * that need to be referenceable across multiple files.
+ * 
+ * Will be loaded near the beginning of the HTML file to ensure
+ * precedence over other files.
+ */
+
+// declared in globals.js
+colorDict = {
     selectedCatOutline: getComputedStyle(document.documentElement).getPropertyValue('--selected-cat-outline'),
     selectedCatFill: getComputedStyle(document.documentElement).getPropertyValue('--selected-cat-fill'),
     upstreamCatOutline: getComputedStyle(document.documentElement).getPropertyValue('--upstream-cat-outline'),
@@ -10,8 +19,10 @@ var colorDict = {
     clearFill: getComputedStyle(document.documentElement).getPropertyValue('--clear-fill')
 };
 
+console.log("Color dictionary initialized:", colorDict);
+
 // add the PMTiles plugin to the maplibregl global.
-let protocol = new pmtiles.Protocol({ metadata: true });
+protocol = new pmtiles.Protocol({ metadata: true });
 maplibregl.addProtocol("pmtiles", protocol.tile);
 
 // select light-style if the browser is in light mode

@@ -8,7 +8,8 @@
  * Moved to different file to adjust the load order.
  */
 
-var map = new maplibregl.Map({
+// Map declaration in globals.js
+map = new maplibregl.Map({
     container: "map", // container id
     style: style, // style URL
     center: [-96, 40], // starting position [lng, lat]
