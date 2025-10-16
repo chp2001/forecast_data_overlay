@@ -9,21 +9,6 @@
  * @see {@link https://github.com/CIROH-UA/NGIAB_data_preprocess}
  */
 
-// declared in globals.js
-colorDict = {
-    selectedCatOutline: getComputedStyle(document.documentElement).getPropertyValue('--selected-cat-outline'),
-    selectedCatFill: getComputedStyle(document.documentElement).getPropertyValue('--selected-cat-fill'),
-    upstreamCatOutline: getComputedStyle(document.documentElement).getPropertyValue('--upstream-cat-outline'),
-    upstreamCatFill: getComputedStyle(document.documentElement).getPropertyValue('--upstream-cat-fill'),
-    flowlineToCatOutline: getComputedStyle(document.documentElement).getPropertyValue('--flowline-to-cat-outline'),
-    flowlineToNexusOutline: getComputedStyle(document.documentElement).getPropertyValue('--flowline-to-nexus-outline'),
-    nexusOutline: getComputedStyle(document.documentElement).getPropertyValue('--nexus-outline'),
-    nexusFill: getComputedStyle(document.documentElement).getPropertyValue('--nexus-fill'),
-    clearFill: getComputedStyle(document.documentElement).getPropertyValue('--clear-fill')
-};
-
-console.log("Color dictionary initialized:", colorDict);
-
 // add the PMTiles plugin to the maplibregl global.
 protocol = new pmtiles.Protocol({ metadata: true });
 maplibregl.addProtocol("pmtiles", protocol.tile);

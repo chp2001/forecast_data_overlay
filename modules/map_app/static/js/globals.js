@@ -47,12 +47,3 @@ var map;
  * PMTiles protocol object, initialized in main.js
  */
 var protocol;
-
-/**
- * @type {Object<string, string>}
- * @description
- * Dictionary of colors used in the map, pulled from CSS variables.
- * 
- * @todo Check if this is actually used anywhere... Or if it has a real value.
- */
-var colorDict;
