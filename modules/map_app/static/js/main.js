@@ -1,40 +1,29 @@
-var colorDict = {
-    selectedCatOutline: getComputedStyle(document.documentElement).getPropertyValue('--selected-cat-outline'),
-    selectedCatFill: getComputedStyle(document.documentElement).getPropertyValue('--selected-cat-fill'),
-    upstreamCatOutline: getComputedStyle(document.documentElement).getPropertyValue('--upstream-cat-outline'),
-    upstreamCatFill: getComputedStyle(document.documentElement).getPropertyValue('--upstream-cat-fill'),
-    flowlineToCatOutline: getComputedStyle(document.documentElement).getPropertyValue('--flowline-to-cat-outline'),
-    flowlineToNexusOutline: getComputedStyle(document.documentElement).getPropertyValue('--flowline-to-nexus-outline'),
-    nexusOutline: getComputedStyle(document.documentElement).getPropertyValue('--nexus-outline'),
-    nexusFill: getComputedStyle(document.documentElement).getPropertyValue('--nexus-fill'),
-    clearFill: getComputedStyle(document.documentElement).getPropertyValue('--clear-fill')
-};
-
-// // These functions are exported by data_processing.js
-// document.getElementById('map').addEventListener('click', create_cli_command);
-// document.getElementById('start-time').addEventListener('change', create_cli_command);
-// document.getElementById('end-time').addEventListener('change', create_cli_command);
-
+/**
+ * @file File for initializing various global variables and data structures
+ * that need to be referenceable across multiple files.
+ * 
+ * Will be loaded near the beginning of the HTML file to ensure
+ * precedence over other files.
+ * 
+ * Code primarily from [JoshCu](www.github.com/JoshCu)'s repository:
+ * @see {@link https://github.com/CIROH-UA/NGIAB_data_preprocess}
+ */
 
 // add the PMTiles plugin to the maplibregl global.
-let protocol = new pmtiles.Protocol({ metadata: true });
+protocol = new pmtiles.Protocol({ metadata: true });
 maplibregl.addProtocol("pmtiles", protocol.tile);
+
 
 // select light-style if the browser is in light mode
 // select dark-style if the browser is in dark mode
 var style = 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/light-style.json';
+// (style is only used in after_map.js to initialize the map after this section)
+// (nwm_paint and aorc_paint are used once each in map_configs/basic_layers.js)
 var colorScheme = "light";
 if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     style = 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/dark-style.json';
     colorScheme = "dark";
 }
-var map = new maplibregl.Map({
-    container: "map", // container id
-    style: style, // style URL
-    center: [-96, 40], // starting position [lng, lat]
-    zoom: 4, // starting zoom
-});
-
 
 if (colorScheme == "light") {
     nwm_paint = {
@@ -57,27 +46,6 @@ if (colorScheme == "dark") {
     };
 }
 
-
-function update_map(cat_id, e) {
-    $('#selected-basins').text(cat_id)
-    map.setFilter('selected-catchments', ['any', ['in', 'divide_id', cat_id]]);
-    map.setFilter('upstream-catchments', ['any', ['in', 'divide_id', ""]])
-    fetch('/get_upstream_catids', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cat_id),
-    })
-        .then(response => response.json())
-        .then(data => {
-            map.setFilter('upstream-catchments', ['any', ['in', 'divide_id', ...data]]);
-            if (data.length === 0) {
-                new maplibregl.Popup()
-                    .setLngLat(e.lngLat)
-                    .setHTML('No upstreams')
-                    .addTo(map);
-            }
-        });
-}
 // map.on('click', 'catchments', (e) => {
 //   cat_id = e.features[0].properties.divide_id;
 //   update_map(cat_id, e);
@@ -89,64 +57,7 @@ const popup = new maplibregl.Popup({
     closeOnClick: false
 });
 
-map.on('mouseenter', 'conus_gages', (e) => {
-    // Change the cursor style as a UI indicator.
-    map.getCanvas().style.cursor = 'pointer';
 
-    const coordinates = e.features[0].geometry.coordinates.slice();
-    const description = e.features[0].properties.hl_uri + "<br> click for more info";
-
-    // Ensure that if the map is zoomed out such that multiple
-    // copies of the feature are visible, the popup appears
-    // over the copy being pointed to.
-    while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-        coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-    }
-
-    // Populate the popup and set its coordinates
-    // based on the feature found.
-    popup.setLngLat(coordinates).setHTML(description).addTo(map);
-});
-
-map.on("mouseleave", "conus_gages", () => {
-    map.getCanvas().style.cursor = "";
-    popup.remove();
-});
-
-map.on("click", "conus_gages", (e) => {
-    //  https://waterdata.usgs.gov/monitoring-location/02465000
-    window.open(
-        "https://waterdata.usgs.gov/monitoring-location/" +
-        e.features[0].properties.hl_link,
-        "_blank",
-    );
-});
-
-var local_cache = {
-    colMin: null,
-    colMax: null,
-    rowMin: null,
-    rowMax: null,
-    regionRowMin: null,
-    regionRowMax: null,
-    regionColMin: null,
-    regionColMax: null,
-    scaleX: 16,
-    scaleY: 16,
-    target_time: null,
-    lead_time: null,
-    forecast_cycle: null,
-    lead_time_end: null,
-    range_mode: null
-};
-
-/**
- * @type {{geometry: Array, timestep_values: Object.<number, Array>}}
- */
-var data_cache = {
-    geometry: [],
-    timestep_values: {},
-}
 
 /**
  * Generalized function to request forecasted precipitation data from the server.

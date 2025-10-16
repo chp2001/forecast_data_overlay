@@ -16,21 +16,16 @@
 </head>
 
 <body>
-    <!-- <script src="{{ url_for('static', filename='js/components/double_labeled_slider.js' ) }}"></script> -->
+    <!-- Load prerequisite files before others so globals can be shared -->
+    <script src="{{ url_for('static', filename='js/globals.js' ) }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js' ) }}"></script>
+
     <!-- Use jinja templating to load all of the files in js/components/ -->
     <!-- <p>{{components_filenames}}</p> -->
     {% for filename in components_filenames %}
     <script src="{{ url_for('static', filename='js/components/' + filename) }}"></script>
     {% endfor %}
 
-    <!-- <double-labeled-slider label="test-slider" id="test-slider"></double-labeled-slider> -->
-    <!-- <script src="{{ url_for('static', filename='js/map_configs/scale_config_2.js' ) }}"></script> -->
-    <!-- <scale-config></scale-config> -->
-    <!-- <region-selector id="region-selector"></region-selector> -->
-    <!-- <time-config id="time-config"></time-config> -->
-    <!-- <header>
-        <h1>Select catchments by clicking!</h1>
-    </header> -->
     <main>
         <section id="map-container">
             <button id="toggle-panel-button" aria-label="Toggle Options Panel">☰</button>
@@ -45,14 +40,9 @@
                         <button id="toggle-button-forecast">Show Forecast Data</button>
                     </div>
                     <scale-config id="scale-config"></scale-config>
-                    <!-- <div id="region-selection">
-                        <label for="region-selection">Region Selection:</label>
-                        <div id="region-col-selection"></div>
-                        <div id="region-row-selection"></div>
-                        <button id="set-region">Set Region</button>
-                    </div> -->
                     <region-selector id="region-selector"></region-selector>
                     <time-config id="time-config"></time-config>
+                    <animation-control id="animation-control"></animation-control>
                 </div>
             </div>
             <script>
@@ -64,8 +54,9 @@
                 });
             </script>
             <div id="map"></div>
+            <!-- <threshold-legend id="threshold-legend"></threshold-legend> -->
         </section>
-
+        <script src="{{ url_for('static', filename='js/after_map.js' ) }}"></script>
 
 
 
@@ -77,17 +68,17 @@
         </div>
         <div id="logOutput"></div>
     </div>
-    <script src="{{ url_for('static', filename='js/console.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/data_processing.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/main.js' ) }}"></script>
     <!-- Leaving these manual... Trying to dynamically load them causes problems -->
     <script src="{{ url_for('static', filename='js/map_configs/scale_config.js' ) }}"></script>
     <script src="{{ url_for('static', filename='js/map_configs/time_config.js' ) }}"></script>
     <script src="{{ url_for('static', filename='js/map_configs/basic_layers.js' ) }}"></script>
     <script src="{{ url_for('static', filename='js/map_configs/region_config.js' ) }}"></script>
     <script src="{{ url_for('static', filename='js/map_configs/forecast_layers.js' ) }}"></script>
+    <script src="{{ url_for('static', filename='js/map_configs/gages_layer.js' ) }}"></script>
     <script src="{{ url_for('static', filename='js/map_configs/layer_toggles.js' ) }}"></script>
     <script src="{{ url_for('static', filename='js/map_configs/resume_session.js' ) }}"></script>
+
+    <script src="{{ url_for('static', filename='js/console.js') }}"></script>
 </body>
 
 </html>

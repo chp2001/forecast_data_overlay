@@ -54,6 +54,15 @@ if (use_old_time_config) {
     if (!timeConfigElement) {
         throw new Error('Time config element not found');
     }
+    /**
+     * @type {animation_control}
+     */
+    var animationControlElement = document.getElementById('animation-control');
+    if (!animationControlElement) {
+        throw new Error('Animation control element not found');
+    }
+    // Couple the animation control element to the time config element
+    animationControlElement.addTimeConfigCoupling(timeConfigElement);
     // Only logic to handle here now is cache interaction and request submission/reception
     timeConfigElement.addOnSubmitFunction(
         'time-config-cache-update',
