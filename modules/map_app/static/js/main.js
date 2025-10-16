@@ -4,6 +4,9 @@
  * 
  * Will be loaded near the beginning of the HTML file to ensure
  * precedence over other files.
+ * 
+ * Code primarily from [JoshCu](www.github.com/JoshCu)'s repository:
+ * @see {@link https://github.com/CIROH-UA/NGIAB_data_preprocess}
  */
 
 // declared in globals.js

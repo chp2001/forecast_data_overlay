@@ -2,7 +2,7 @@
  * File specifically for the functions to configure the gages layer.
  * 
  * Code primarily from [JoshCu](www.github.com/JoshCu)'s repository:
- * https://github.com/CIROH-UA/NGIAB_data_preprocess
+ * @see {@link https://github.com/CIROH-UA/NGIAB_data_preprocess}
  */
 
 map.on('mouseenter', 'conus_gages', (e) => {
