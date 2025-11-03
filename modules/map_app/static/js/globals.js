@@ -38,7 +38,7 @@ var pmtiles = window.pmtiles;
  * @description
  * Map object, initialized in after_map.js
  */
-var map; 
+var map;
 
 /**
  * @type {pmtiles.Protocol}
@@ -89,20 +89,20 @@ var data_cache = {
  */
 var noaa_threshold_color_sets = {
     "precip_1h": [
-        { min: 10, color: `rgb(215, 215, 215)`}, // very light gray
-        { min: 8, color: `rgb(114, 64, 214)`}, // purple
-        { min: 6, color: `rgb(246, 0, 242)`}, // magenta
-        { min: 5, color: `rgb(112, 2, 9)`}, // dark red
-        { min: 4, color: `rgb(162, 3, 17)`}, // red
-        { min: 3, color: `rgb(245, 7, 25)`}, // bright red
-        { min: 2.5, color: `rgb(246, 140, 40)`}, // orange
-        { min: 2, color: `rgb(253, 212, 105)`}, // yellow-orange
-        { min: 1.5, color: `rgb(248, 250, 61)`}, // yellow
-        { min: 1, color: `rgb(14, 89, 24)`}, // darkish-green
-        { min: 0.75, color: `rgb(24, 150, 36)`}, // green
-        { min: 0.5, color: `rgb(40, 250, 59)`}, // light-green
-        { min: 0.25, color: `rgb(12, 18, 135)`}, // dark-blue
-        { min: 0.1, color: `rgb(59, 121, 187)`}, // lightish-blue
-        { min: 0.01, color: `rgb(43, 192, 245)`}, // very-light-blue or cyan
+        { min: 10, color: `rgb(215, 215, 215)` }, // very light gray
+        { min: 8, color: `rgb(114, 64, 214)` }, // purple
+        { min: 6, color: `rgb(246, 0, 242)` }, // magenta
+        { min: 5, color: `rgb(112, 2, 9)` }, // dark red
+        { min: 4, color: `rgb(162, 3, 17)` }, // red
+        { min: 3, color: `rgb(245, 7, 25)` }, // bright red
+        { min: 2.5, color: `rgb(246, 140, 40)` }, // orange
+        { min: 2, color: `rgb(253, 212, 105)` }, // yellow-orange
+        { min: 1.5, color: `rgb(248, 250, 61)` }, // yellow
+        { min: 1, color: `rgb(14, 89, 24)` }, // darkish-green
+        { min: 0.75, color: `rgb(24, 150, 36)` }, // green
+        { min: 0.5, color: `rgb(40, 250, 59)` }, // light-green
+        { min: 0.25, color: `rgb(12, 18, 135)` }, // dark-blue
+        { min: 0.1, color: `rgb(59, 121, 187)` }, // lightish-blue
+        { min: 0.01, color: `rgb(43, 192, 245)` }, // very-light-blue or cyan
     ]
 }

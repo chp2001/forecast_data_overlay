@@ -15,3 +15,8 @@ map = new maplibregl.Map({
     center: [-96, 40], // starting position [lng, lat]
     zoom: 4, // starting zoom
 });
+
+// Auto-resize to fit the container
+map.on('load', () => {
+    map.resize();
+});

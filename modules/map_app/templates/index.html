@@ -27,7 +27,7 @@
     {% endfor %}
 
     <main>
-        <section id="map-container">
+        <section id="map-container" style="height: 500px;">
             <button id="toggle-panel-button" aria-label="Toggle Options Panel">☰</button>
             <div id="options-panel" class="minimized">
                 <div id="panel-spacer" style="height: 20px;"></div>
@@ -54,7 +54,7 @@
                 });
             </script>
             <div id="map"></div>
-            <!-- <threshold-legend id="threshold-legend"></threshold-legend> -->
+            <threshold-legend id="threshold-legend"></threshold-legend>
         </section>
         <script src="{{ url_for('static', filename='js/after_map.js' ) }}"></script>
 
