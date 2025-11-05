@@ -47,6 +47,12 @@ if (use_old_time_config) {
         }
     });
 } else {
+
+    /**
+     * @import {time_config} from '../components/time_config_element.js';
+     * @import {animation_control} from '../components/animation_control_element.js';
+     */
+
     /**
      * @type {time_config}
      */

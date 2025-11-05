@@ -1,51 +1,10 @@
-// Previous structure:
+// time_config_element.js
 
-// <section id="time-settings">
-//     <label for="time-settings">Time Settings:</label>
-//     <div class="time-input" style="display: flex; flex-direction: column; margin-bottom: 10px;">
-//         <label for="target-time">Target Time:</label>
-//         <!-- <input type="datetime-local" id="target-time" name="target-time" value="2018-09-17T00:00"
-//             min="2018-09-17T00:00"> -->
-//         <!-- max date is today's date to be safe... can handle on JS end -->
-//         <input type="date" id="target-time" name="target-time" value="2025-07-04"
-//             min="2018-09-17">
-//     </div>
-//     <div class="lead-time-input">
-//         <label for="lead-time">Lead Time (hours):</label>
-//         <input type="range" id="lead-time" name="lead-time" value="1" min="1" max="18" step="1">
-//         <span id="lead-time-value">1</span>
-//     </div>
-//     <div class="forecast-cycle-input">
-//         <label for="forecast-cycle">Forecast Cycle:</label>
-//         <input type="range" id="forecast-cycle" name="forecast-cycle" value="0" min="0" max="23"
-//             step="1">
-//         <span id="forecast-cycle-value">0</span>
-//     </div>
-//     <div class="selected-values" style="outline: 1px solid #ccc; padding: 3px; margin-top: 10px;">
-//         <!--Display the values as they were when the `set-time` button was last pressed-->
-//         <!--The user must press the button for this section to be populated-->
-//         <p>Selected Time: <span id="selected-time">None</span></p>
-//         <p>Selected Lead Time: <span id="selected-lead-time">None</span></p>
-//         <p>Selected Forecast Cycle: <span id="selected-forecast-cycle">None</span></p>
-//     </div>
-//     <button id="set-time">Set Time</button>
-// </section>
+// 'Imports' (Mark things we need from files that are loaded earlier in the HTML file)
 
-// Implementing new structure as time_config_element.js
-
-// Unlike the Scale and Region components, the value of individual sliders
-// are unimportant until the user requests the data using the "Set Time" button.
-// Therefore we do not need to use the double labeled slider component here.
-// The forecast cycle and lead time inputs can be simple sliders or number inputs.
-
-// Definitely unlike the original, we do not want to use datetime-local inputs,
-// as the time selection clashes with the forecast-cycle input 
-// (Forecast cycle determines the hour of the day for requests.)
-
-// At the same time, we need to begin preparing for the animation / time series
-// functionality, which means we need to allow for revealing an additional lead time
-// slider when the time series mode is activated.
-
+/**
+ * @import {CallbackDict} from '../utilities/callbacks.js';
+ */
 
 // Use a config object to avoid cluttering the global namespace
 // and to make it easier to change strings and IDs later if needed.
