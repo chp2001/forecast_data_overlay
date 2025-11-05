@@ -226,13 +226,14 @@ class animation_control extends HTMLElement {
 
     /**
      * Add time config couplings.
-     * @param {time_config_element} timeConfigElement - The time config element to couple with.
+     * @param {time_config} timeConfigElement - The time config element to couple with.
      */
     addTimeConfigCoupling(timeConfigElement) {
         // RANGE SLIDER RELEVANT CODE
         // When the time config selection display is updated, update the animation control's
         // visibility and/or displays
-        timeConfigElement.addOnDisplaySelectFunction('animation_control_' + this.uuid, (args) => {
+        // timeConfigElement.addOnDisplaySelectFunction('animation_control_' + this.uuid, (args) => {
+            timeConfigElement.displaySelectCallbacks.add('animation_control_' + this.uuid, (args) => {
             // RANGE SLIDER RELEVANT CODE
             this.checkRangeSliderVisibility(timeConfigElement);
             this.updateRangeSliderSegment(timeConfigElement);
