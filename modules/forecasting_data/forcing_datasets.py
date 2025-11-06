@@ -4,6 +4,7 @@ if __name__ == "__main__":
     import sys
 
     sys.path.append("./modules/")
+from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Callable, TypeAlias
 import xarray as xr
 import os
@@ -25,6 +26,7 @@ from forecasting_data.forecast_datasets import (
 )
 
 geom_t: TypeAlias = List[Tuple[float, float]]
+
 
 def load_forecasted_forcings(
     start_date: str,
@@ -78,7 +80,7 @@ def load_forecasted_forcings(
 
 def load_forecasted_forcing(
     date: str,
-    fcst_cycle: int = 0,
+    forecast_cycle: int = 0,
     lead_time: int = 1,
     runtype: NWMRun = NWMRun.SHORT_RANGE,
     geosource: NWMGeo = NWMGeo.CONUS,
@@ -102,7 +104,7 @@ def load_forecasted_forcing(
         raise ValueError("Date must be provided.")
     if not quiet:
         print(
-            f"Preparing to load forecasted forcing for date: {date}, cycle: {fcst_cycle}, lead time: {lead_time}"
+            f"Preparing to load forecasted forcing for date: {date}, cycle: {forecast_cycle}, lead time: {lead_time}"
         )
     # Create a file list for the specified date, forecast cycle, and lead time
     file_list = create_default_file_list(
@@ -112,7 +114,7 @@ def load_forecasted_forcing(
         meminput=mem,
         start_date=date,
         end_date=date,
-        fcst_cycle=[fcst_cycle],
+        fcst_cycle=[forecast_cycle],
         lead_time=[lead_time],
     )
     assert (
@@ -233,7 +235,7 @@ def get_example_forcing_dataset() -> xr.Dataset:
         print("Loaded example dataset from cache.")
     except FileNotFoundError:
         print("No example dataset found, loading a new one.")
-        dataset = load_forecasted_forcing(date="202301010000", fcst_cycle=0, lead_time=1)
+        dataset = load_forecasted_forcing(date="202301010000", forecast_cycle=0, lead_time=1)
         if not os.path.exists("./dist/"):
             os.makedirs("./dist/")
         with open("./dist/example_dataset.pkl", "wb") as f:
@@ -249,7 +251,9 @@ def get_example_forcing_dataset_raw(quiet: bool = False) -> xr.Dataset:
     Returns:
         xr.Dataset: An example xarray Dataset.
     """
-    dataset = load_forecasted_forcing(date="202301010000", fcst_cycle=0, lead_time=1, quiet=quiet)
+    dataset = load_forecasted_forcing(
+        date="202301010000", forecast_cycle=0, lead_time=1, quiet=quiet
+    )
     return dataset
 
 
@@ -497,9 +501,91 @@ def uncached_get_point_geometry(
 
 
 @cache
+def load_forecasted_dataset_with_options(
+    date: str,
+    forecast_cycle: int = 0,
+    lead_time: int = 1,
+    scaleX: Optional[int] = None,
+    scaleY: Optional[int] = None,
+    rowMin: Optional[int] = None,
+    rowMax: Optional[int] = None,
+    colMin: Optional[int] = None,
+    colMax: Optional[int] = None,
+) -> xr.Dataset:
+    """Use caching to make repeated access to the same data faster by
+    running the calculations previously in `views.py::get_forecast_precip`
+    within a function with hashable arguments.
+
+    Bounding box for clipping is before scaling.
+    Args:
+        date (str): Date in 'YYYYMMDD' format.
+        forcast_cycle (int): Forecast cycle hour (default is 0).
+        lead_time (int): Lead time in hours (default is 1).
+        scaleX (Optional[int]): The number of x points to collapse into one.
+        scaleY (Optional[int]): The number of y points to collapse into one.
+        rowMin (Optional[int]): Minimum row index to slice the data.
+        rowMax (Optional[int]): Maximum row index to slice the data.
+        colMin (Optional[int]): Minimum column index to slice the data.
+        colMax (Optional[int]): Maximum column index to slice the data.
+    Returns:
+        xr.Dataset: The processed xarray Dataset. For download or otherwise.
+    """
+    dataset = load_forecasted_forcing(date=date, forecast_cycle=forecast_cycle, lead_time=lead_time)
+    if all(v is not None for v in [rowMin, rowMax, colMin, colMax]):
+        rangeAdjustX = 16 if scaleX is not None else scaleX
+        rangeAdjustY = 16 if scaleY is not None else scaleY
+        dataset = dataset.isel(
+            y=slice(rowMin, rowMax - rangeAdjustY), x=slice(colMin, colMax - rangeAdjustX)
+        )
+    if scaleX is not None and scaleY is not None:
+        dataset = dataset.coarsen(x=scaleX, y=scaleY, boundary="trim").mean()
+    return dataset
+
+
+def save_forecasted_dataset_with_options(
+    file_path: Path,
+    date: str,
+    forecast_cycle: int = 0,
+    lead_time: int = 1,
+    scaleX: Optional[int] = None,
+    scaleY: Optional[int] = None,
+    rowMin: Optional[int] = None,
+    rowMax: Optional[int] = None,
+    colMin: Optional[int] = None,
+    colMax: Optional[int] = None,
+) -> None:
+    """Save the processed forecasted dataset to a NetCDF file.
+
+    Args:
+        file_path (Path): The file path to save the dataset.
+        date (str): Date in 'YYYYMMDD' format.
+        forcast_cycle (int): Forecast cycle hour (default is 0).
+        lead_time (int): Lead time in hours (default is 1).
+        scaleX (Optional[int]): The number of x points to collapse into one.
+        scaleY (Optional[int]): The number of y points to collapse into one.
+        rowMin (Optional[int]): Minimum row index to slice the data.
+        rowMax (Optional[int]): Maximum row index to slice the data.
+        colMin (Optional[int]): Minimum column index to slice the data.
+        colMax (Optional[int]): Maximum column index to slice the data.
+    """
+    dataset = load_forecasted_dataset_with_options(
+        date=date,
+        forecast_cycle=forecast_cycle,
+        lead_time=lead_time,
+        scaleX=scaleX,
+        scaleY=scaleY,
+        rowMin=rowMin,
+        rowMax=rowMax,
+        colMin=colMin,
+        colMax=colMax,
+    )
+    dataset.to_netcdf(path=file_path)
+
+
+@cache
 def load_forecasted_forcing_with_options(
     date: str,
-    fcst_cycle: int = 0,
+    forecast_cycle: int = 0,
     lead_time: int = 1,
     scaleX: Optional[int] = None,
     scaleY: Optional[int] = None,
@@ -515,7 +601,7 @@ def load_forecasted_forcing_with_options(
     Bounding box for clipping is before scaling.
     Args:
         date (str): Date in 'YYYYMMDD' format.
-        fcst_cycle (int): Forecast cycle hour (default is 0).
+        forecast_cycle (int): Forecast cycle hour (default is 0).
         lead_time (int): Lead time in hours (default is 1).
         scaleX (Optional[int]): The number of x points to collapse into one.
         scaleY (Optional[int]): The number of y points to collapse into one.
@@ -528,7 +614,7 @@ def load_forecasted_forcing_with_options(
             - Precipitation data as an xarray DataArray.
             - A pyproj Transformer to convert from the dataset's projection to EPSG:4326.
     """
-    dataset = load_forecasted_forcing(date=date, fcst_cycle=fcst_cycle, lead_time=lead_time)
+    dataset = load_forecasted_forcing(date=date, forecast_cycle=forecast_cycle, lead_time=lead_time)
     precip_data = dataset["RAINRATE"]
     if all(v is not None for v in [rowMin, rowMax, colMin, colMax]):
         rangeAdjustX = 16 if scaleX is not None else scaleX
@@ -541,9 +627,10 @@ def load_forecasted_forcing_with_options(
     )
     return precip_data, transformer
 
+
 def get_timestep_data_for_frontend(
     selected_time: str,  # YYYYMMDD
-    fcst_cycle: int,
+    forecast_cycle: int,
     lead_time: int,
     scaleX: Optional[int] = None,
     scaleY: Optional[int] = None,
@@ -551,7 +638,7 @@ def get_timestep_data_for_frontend(
     rowMax: Optional[int] = None,
     colMin: Optional[int] = None,
     colMax: Optional[int] = None,
-    **kwargs
+    **kwargs,
 ) -> Dict[str, List]:
     """
     Migrated functionality from `views.py::get_forecast_precip` to a function,
@@ -561,7 +648,7 @@ def get_timestep_data_for_frontend(
     # Wrapper for the cached version to allow for ignored arguments
     return _get_timestep_data_for_frontend(
         selected_time,
-        fcst_cycle,
+        forecast_cycle,
         lead_time,
         scaleX,
         scaleY,
@@ -571,10 +658,11 @@ def get_timestep_data_for_frontend(
         colMax,
     )
 
+
 @cache
 def _get_timestep_data_for_frontend(
     selected_time: str,  # YYYYMMDD
-    fcst_cycle: int,
+    forecast_cycle: int,
     lead_time: int,
     scaleX: Optional[int] = None,
     scaleY: Optional[int] = None,
@@ -611,7 +699,7 @@ def _get_timestep_data_for_frontend(
     # grab data the way the view function did first
     precip_data_array, transformer = load_forecasted_forcing_with_options(
         date=selected_time,
-        fcst_cycle=fcst_cycle,
+        forecast_cycle=forecast_cycle,
         lead_time=lead_time,
         scaleX=scaleX,
         scaleY=scaleY,
@@ -661,10 +749,11 @@ def _get_timestep_data_for_frontend(
         tlog(f"Total time for get_timestep_data_for_frontend: {t3 - t0:.2f} seconds")
     return data_dict
 
+
 @cache
 def _get_timestep_values_for_frontend(
     selected_time: str,  # YYYYMMDD
-    fcst_cycle: int,
+    forecast_cycle: int,
     lead_time: int,
     scaleX: Optional[int] = None,
     scaleY: Optional[int] = None,
@@ -682,12 +771,15 @@ def _get_timestep_values_for_frontend(
     # Enable timing logs for debugging performance issues
     do_timing_logs = False
     # minimum time in seconds to log
-    do_timing_threshold = 1.0  
+    do_timing_threshold = 1.0
+
     def tlog(*args, dt=None, thr=None, **kwargs):
         threshold = thr if thr is not None else do_timing_threshold
         if do_timing_logs:
-            if dt is not None and dt < threshold: return
+            if dt is not None and dt < threshold:
+                return
             print(*args, **kwargs)
+
     # # Function for paring down data unwanted on the frontend
     # (skipping paring, we want all values here)
     ## End configuration segment
@@ -699,7 +791,7 @@ def _get_timestep_values_for_frontend(
     # (Not working with geometry here, so ignore transformer)
     precip_data_array, _ = load_forecasted_forcing_with_options(
         date=selected_time,
-        fcst_cycle=fcst_cycle,
+        forecast_cycle=forecast_cycle,
         lead_time=lead_time,
         scaleX=scaleX,
         scaleY=scaleY,
@@ -720,14 +812,21 @@ def _get_timestep_values_for_frontend(
                 value = precip_data_array_np[t, y, x]
                 values.append(value)
     t2 = perf_counter()
-    tlog(f"Processing data into {len(values)} values took {t2 - t1:.2f} seconds", dt=t2 - t1, thr=0.5)
+    tlog(
+        f"Processing data into {len(values)} values took {t2 - t1:.2f} seconds", dt=t2 - t1, thr=0.5
+    )
     if do_timing_logs:
-        tlog(f"Total time for _get_timestep_values_for_frontend: {t2 - t0:.2f} seconds", dt=t2 - t0, thr=0.0)
+        tlog(
+            f"Total time for _get_timestep_values_for_frontend: {t2 - t0:.2f} seconds",
+            dt=t2 - t0,
+            thr=0.0,
+        )
     return values
+
 
 def get_timesteps_data_for_frontend(
     selected_time: str,  # YYYYMMDD
-    fcst_cycle: int,
+    forecast_cycle: int,
     # lead_times: List[int],
     lead_times: Tuple[int, ...],
     scaleX: Optional[int] = None,
@@ -736,13 +835,13 @@ def get_timesteps_data_for_frontend(
     rowMax: Optional[int] = None,
     colMin: Optional[int] = None,
     colMax: Optional[int] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[Dict[int, List[float]], List[geom_t]]:
     """
     Get the values for multiple lead times, and a single common geometry set.
     This is useful for sending multiple timesteps to the frontend at once,
     without duplicating the geometry data.
-    
+
     Data is requested from the `_get_timestep_values_for_frontend` function
     for each lead time, and then geometries and values are filtered
     as a group to reduce the amount of extra data and geometry sent to the frontend.
@@ -752,7 +851,7 @@ def get_timesteps_data_for_frontend(
     # Wrapper for the cached version to allow for ignored arguments
     return _get_timesteps_data_for_frontend(
         selected_time,
-        fcst_cycle,
+        forecast_cycle,
         lead_times,
         scaleX,
         scaleY,
@@ -762,10 +861,11 @@ def get_timesteps_data_for_frontend(
         colMax,
     )
 
+
 @cache
 def _get_timesteps_data_for_frontend(
     selected_time: str,  # YYYYMMDD
-    fcst_cycle: int,
+    forecast_cycle: int,
     # lead_times: List[int],
     lead_times: Tuple[int, ...],
     scaleX: Optional[int] = None,
@@ -779,7 +879,7 @@ def _get_timesteps_data_for_frontend(
     Get the values for multiple lead times, and a single common geometry set.
     This is useful for sending multiple timesteps to the frontend at once,
     without duplicating the geometry data.
-    
+
     Data is requested from the `_get_timestep_values_for_frontend` function
     for each lead time, and then geometries and values are filtered
     as a group to reduce the amount of extra data and geometry sent to the frontend.
@@ -810,13 +910,13 @@ def _get_timesteps_data_for_frontend(
     if not lead_times:
         raise ValueError("No lead times specified.")
     # Don't need to arrange the data into a dict until the end
-    sub_times: List[float] = [] # time checkpoints for each lead time load
+    sub_times: List[float] = []  # time checkpoints for each lead time load
     lead_time_values: List[List[float]] = []
     for lead_time in lead_times:
         try:
             values = _get_timestep_values_for_frontend(
                 selected_time,
-                fcst_cycle,
+                forecast_cycle,
                 lead_time,
                 scaleX,
                 scaleY,
@@ -831,12 +931,14 @@ def _get_timesteps_data_for_frontend(
             print(f"Error loading data for lead_time={lead_time}: {e}")
             raise e
     t1 = perf_counter()
-    assert len(lead_time_values) == len(lead_times), f"Mismatch in lead times and values lengths: {len(lead_times)} vs {len(lead_time_values)}"
+    assert len(lead_time_values) == len(
+        lead_times
+    ), f"Mismatch in lead times and values lengths: {len(lead_times)} vs {len(lead_time_values)}"
     tlog(f"Loading {len(lead_times)} lead times took {t1 - t0:.2f} seconds")
     # Now we need to get the geometries for the first lead time.
     precip_data_array, transformer = load_forecasted_forcing_with_options(
         date=selected_time,
-        fcst_cycle=fcst_cycle,
+        forecast_cycle=forecast_cycle,
         lead_time=lead_times[0],
         scaleX=scaleX,
         scaleY=scaleY,
@@ -858,11 +960,13 @@ def _get_timesteps_data_for_frontend(
     for t in range(precip_data_array.shape[0]):
         for y in range(precip_data_array.shape[1]):
             for x in range(precip_data_array.shape[2]):
-                i += 1 # Flat index for the lead_time_values lists
+                i += 1  # Flat index for the lead_time_values lists
                 # Gather values for all lead times at this point
                 point_values = [lt_values[i] for lt_values in lead_time_values]
                 # Check if all values should be skipped
-                if all([v is None or np.isnan(v) or isclose(v, 0.0, atol=1e-6) for v in point_values]):
+                if all(
+                    [v is None or np.isnan(v) or isclose(v, 0.0, atol=1e-6) for v in point_values]
+                ):
                     continue
                 # If not skipped, add the values to the dict
                 for lt, v in zip(lead_times, point_values):
@@ -887,6 +991,7 @@ def _get_timesteps_data_for_frontend(
     if do_timing_logs:
         tlog(f"Total time for _get_timesteps_data_for_frontend: {t4 - t0:.2f} seconds")
     return values_dict, geometries
+
 
 if __name__ == "__main__":
     import time

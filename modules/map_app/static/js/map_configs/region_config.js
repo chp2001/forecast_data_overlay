@@ -18,6 +18,11 @@ function r_c_d_log(...args) {
 }
 
 // New method using the region-selector component
+
+/**
+ * @import {region_selector} from '../components/region_selector_element.js';
+ */
+
 /**
  * @type {region_selector}
  */
@@ -120,7 +125,8 @@ function externalSetRegionValues(rowMin, rowMax, colMin, colMax) {
 }
 
 // Callbacks for when the sliders are adjusted without setting them
-regionSelectorElement.addOnRegionSelectionFunction(
+// regionSelectorElement.addOnRegionSelectionFunction(
+regionSelectorElement.regionSelectionCallbacks.add(
     'region-config-selection-update', 
     ({rowMin = null, rowMax = null, colMin = null, colMax = null}={}) =>
     {
@@ -134,7 +140,8 @@ regionSelectorElement.addOnRegionSelectionFunction(
     }
 );
 // Callbacks for when the values are locked in
-regionSelectorElement.addOnRegionSetFunction(
+// regionSelectorElement.addOnRegionSetFunction(
+regionSelectorElement.regionSetCallbacks.add(
     'region-config-set-update',
     ({rowMin = null, rowMax = null, colMin = null, colMax = null}={}) =>
     {

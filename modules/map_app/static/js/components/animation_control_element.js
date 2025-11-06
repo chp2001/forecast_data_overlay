@@ -1,3 +1,11 @@
+// animation_control_element.js
+
+// 'Imports' (Mark things we need from files that are loaded earlier in the HTML file)
+
+/**
+ * @import {time_config} from './time_config_element.js';
+ * @import {CallbackDict} from '../utilities/callbacks.js';
+ */
 
 // Use a config object to avoid cluttering the global namespace
 // and to make it easier to change strings and IDs later if needed.
@@ -44,12 +52,16 @@ class animation_control extends HTMLElement {
         this.rangeSliderElement = null; // The range slider element itself
         this.rangeSliderValue = null; // The current value of the range slider
 
+        // /**
+        //  * This is a temporary solution for now, and won't have proper infrastructure until
+        //  * later.
+        //  * @type {Object.<string, onRangeSliderChangeCallback>}
+        //  */
+        // this.onRangeSliderChangeFuncs = {};
         /**
-         * This is a temporary solution for now, and won't have proper infrastructure until
-         * later.
-         * @type {Object.<string, onRangeSliderChangeCallback>}
+         * @type {CallbackDict<onRangeSliderChangeCallback>}
          */
-        this.onRangeSliderChangeFuncs = {};
+        this.onRangeSliderChangeFuncs = new CallbackDict();
 
         // Playback control elements
         this.playButtonContainer = null; // Container for the play button
@@ -207,10 +219,11 @@ class animation_control extends HTMLElement {
         if (animation_control_config.range_slider_select_spam_console_log) {
             console.log('Range slider changed, triggering callbacks with new lead time:', value);
         }
-        // Call any registered onRangeSliderChange functions
-        for (const key in this.onRangeSliderChangeFuncs) {
-            this.onRangeSliderChangeFuncs[key](newValue);
-        }
+        // // Call any registered onRangeSliderChange functions
+        // for (const key in this.onRangeSliderChangeFuncs) {
+        //     this.onRangeSliderChangeFuncs[key](newValue);
+        // }
+        this.onRangeSliderChangeFuncs.trigger(newValue);
     }
 
     /**
@@ -226,13 +239,14 @@ class animation_control extends HTMLElement {
 
     /**
      * Add time config couplings.
-     * @param {time_config_element} timeConfigElement - The time config element to couple with.
+     * @param {time_config} timeConfigElement - The time config element to couple with.
      */
     addTimeConfigCoupling(timeConfigElement) {
         // RANGE SLIDER RELEVANT CODE
         // When the time config selection display is updated, update the animation control's
         // visibility and/or displays
-        timeConfigElement.addOnDisplaySelectFunction('animation_control_' + this.uuid, (args) => {
+        // timeConfigElement.addOnDisplaySelectFunction('animation_control_' + this.uuid, (args) => {
+            timeConfigElement.displaySelectCallbacks.add('animation_control_' + this.uuid, (args) => {
             // RANGE SLIDER RELEVANT CODE
             this.checkRangeSliderVisibility(timeConfigElement);
             this.updateRangeSliderSegment(timeConfigElement);

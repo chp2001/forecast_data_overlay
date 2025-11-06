@@ -118,3 +118,62 @@ function requestForecastedPrecip(
             return null;
         });
 }
+
+/**
+ * Generalized function to download the netcdfs relevant to the provided parameters.
+ * Saves the files to dist/downloads/ directory.
+ */
+function downloadNetcdfData(
+    selected_time,
+    lead_time,
+    forecast_cycle,
+    scaleX = null,
+    scaleY = null,
+    rowMin = null,
+    rowMax = null,
+    colMin = null,
+    colMax = null,
+    lead_time_end = null,
+    range_mode = null
+) {
+    if (scaleX === null) {
+        scaleX = 16;
+    }
+    if (scaleY === null) {
+        scaleY = 16;
+    }
+    var arg_body = {
+        selected_time: selected_time,
+        lead_time: lead_time,
+        forecast_cycle: forecast_cycle,
+        scaleX: scaleX,
+        scaleY: scaleY,
+        rowMin: rowMin,
+        rowMax: rowMax,
+        colMin: colMin,
+        colMax: colMax,
+        lead_time_end: lead_time_end,
+        range_mode: range_mode
+    }
+    console.log('Requesting netcdf download with args:', arg_body);
+    return fetch("/download_forecast_precip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(arg_body),
+    })
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Network response was not ok, was " + response.status);
+            }
+            // Saving to file was handled server-side, so just return success message
+            return response.json();
+        })
+        .then((data) => {
+            console.log("Netcdf download request successful:", data);
+            return data;
+        })
+        .catch((error) => {
+            console.error("Error requesting netcdf download:", error);
+            return null;
+        });
+}
