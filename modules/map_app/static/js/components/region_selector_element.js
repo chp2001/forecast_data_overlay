@@ -31,6 +31,7 @@
 // import the double-labeled-slider component from components/double_labeled_slider.js
 /**
  * @import { double_labeled_slider } from './double_labeled_slider.js';
+ * @import { CallbackDict } from '../utilities/callbacks.js';
  */
 
 class region_selector extends HTMLElement {
@@ -47,16 +48,24 @@ class region_selector extends HTMLElement {
         this.setButton = null;
         this.container = null;
 
+        // /**
+        //  * Functions to call when the region is set
+        //  * @type {Object.<string, regionSetCallback>}
+        //  */
+        // this.regionSetCallbacks = {};
+        // /**
+        //  * Functions to call when the region selection changes
+        //  * @type {Object.<string, regionSelectionCallback>}
+        //  */
+        // this.regionSelectionCallbacks = {};
         /**
-         * Functions to call when the region is set
-         * @type {Object.<string, regionSetCallback>}
+         * @type {CallbackDict<regionSetCallback>}
          */
-        this.regionSetCallbacks = {};
+        this.regionSetCallbacks = new CallbackDict();
         /**
-         * Functions to call when the region selection changes
-         * @type {Object.<string, regionSelectionCallback>}
+         * @type {CallbackDict<regionSelectionCallback>}
          */
-        this.regionSelectionCallbacks = {};
+        this.regionSelectionCallbacks = new CallbackDict();
 
         this.locked = true; // Whether the x and y scales are locked together
         this.uuid = region_selector.id++;
@@ -69,77 +78,77 @@ class region_selector extends HTMLElement {
     }
 
     // Callback registration functions
-    /**
-     * Add a function to be called when any region is set
-     * @param {string} key - A unique key to identify the callback
-     * @param {regionSetCallback} func - The function to call when the region is set
-     */
-    addOnRegionSetFunction(key, func) {
-        if (this.regionSetCallbacks[key]) {
-            // fail loudly, this shouldn't happen
-            console.error('An onRegionSet callback with key ' + key + ' already exists. Choose a different key.');
-            return;
-        }
-        this.regionSetCallbacks[key] = func;
-    }
+    // /**
+    //  * Add a function to be called when any region is set
+    //  * @param {string} key - A unique key to identify the callback
+    //  * @param {regionSetCallback} func - The function to call when the region is set
+    //  */
+    // addOnRegionSetFunction(key, func) {
+    //     if (this.regionSetCallbacks[key]) {
+    //         // fail loudly, this shouldn't happen
+    //         console.error('An onRegionSet callback with key ' + key + ' already exists. Choose a different key.');
+    //         return;
+    //     }
+    //     this.regionSetCallbacks[key] = func;
+    // }
 
-    /**
-     * Remove a previously added onRegionSet callback
-     * @param {string} key - The unique key identifying the callback to remove
-     */
-    removeOnRegionSetFunction(key) {
-        if (!this.regionSetCallbacks[key]) {
-            console.error('No onRegionSet callback with key ' + key + ' exists. Cannot remove.');
-            return;
-        }
-        delete this.regionSetCallbacks[key];
-    }
+    // /**
+    //  * Remove a previously added onRegionSet callback
+    //  * @param {string} key - The unique key identifying the callback to remove
+    //  */
+    // removeOnRegionSetFunction(key) {
+    //     if (!this.regionSetCallbacks[key]) {
+    //         console.error('No onRegionSet callback with key ' + key + ' exists. Cannot remove.');
+    //         return;
+    //     }
+    //     delete this.regionSetCallbacks[key];
+    // }
 
-    /**
-     * Trigger all registered onRegionSet callbacks
-     * @param {regionBoundArgs} options - The new region set values
-     */
-    triggerOnRegionSet(options) {
-        for (const key in this.regionSetCallbacks) {
-            this.regionSetCallbacks[key](options);
-        }
-    }
+    // /**
+    //  * Trigger all registered onRegionSet callbacks
+    //  * @param {regionBoundArgs} options - The new region set values
+    //  */
+    // triggerOnRegionSet(options) {
+    //     for (const key in this.regionSetCallbacks) {
+    //         this.regionSetCallbacks[key](options);
+    //     }
+    // }
 
-    /**
-     * Add a function to be called when any region selection changes
-     * @param {string} key - A unique key to identify the callback
-     * @param {regionSelectionCallback} func - The function to call when the region selection changes
-     */
-    addOnRegionSelectionFunction(key, func) {
-        if (this.regionSelectionCallbacks[key]) {
-            // fail loudly, this shouldn't happen
-            console.error('An onRegionSelection callback with key ' + key + ' already exists. Choose a different key.');
-            return;
-        }
-        this.regionSelectionCallbacks[key] = func;
-    }
+    // /**
+    //  * Add a function to be called when any region selection changes
+    //  * @param {string} key - A unique key to identify the callback
+    //  * @param {regionSelectionCallback} func - The function to call when the region selection changes
+    //  */
+    // addOnRegionSelectionFunction(key, func) {
+    //     if (this.regionSelectionCallbacks[key]) {
+    //         // fail loudly, this shouldn't happen
+    //         console.error('An onRegionSelection callback with key ' + key + ' already exists. Choose a different key.');
+    //         return;
+    //     }
+    //     this.regionSelectionCallbacks[key] = func;
+    // }
 
-    /**
-     * Remove a previously added onRegionSelection callback
-     * @param {string} key - The unique key identifying the callback to remove
-     */
-    removeOnRegionSelectionFunction(key) {
-        if (!this.regionSelectionCallbacks[key]) {
-            console.error('No onRegionSelection callback with key ' + key + ' exists. Cannot remove.');
-            return;
-        }
-        delete this.regionSelectionCallbacks[key];
-    }
+    // /**
+    //  * Remove a previously added onRegionSelection callback
+    //  * @param {string} key - The unique key identifying the callback to remove
+    //  */
+    // removeOnRegionSelectionFunction(key) {
+    //     if (!this.regionSelectionCallbacks[key]) {
+    //         console.error('No onRegionSelection callback with key ' + key + ' exists. Cannot remove.');
+    //         return;
+    //     }
+    //     delete this.regionSelectionCallbacks[key];
+    // }
     
-    /**
-     * Trigger all registered onRegionSelection callbacks
-     * @param {regionBoundArgs} options - The new region selection values
-     */
-    triggerOnRegionSelection(options) {
-        for (const key in this.regionSelectionCallbacks) {
-            this.regionSelectionCallbacks[key](options);
-        }
-    }
+    // /**
+    //  * Trigger all registered onRegionSelection callbacks
+    //  * @param {regionBoundArgs} options - The new region selection values
+    //  */
+    // triggerOnRegionSelection(options) {
+    //     for (const key in this.regionSelectionCallbacks) {
+    //         this.regionSelectionCallbacks[key](options);
+    //     }
+    // }
 
     /**
      * Set the selection values of the sliders
@@ -158,7 +167,8 @@ class region_selector extends HTMLElement {
         if (colMax !== null) {
             this.xMaxSlider.setExternally({selectionValue: colMax, silent: true});
         }
-        this.triggerOnRegionSelection({rowMin: rowMin, rowMax: rowMax, colMin: colMin, colMax: colMax});
+        // this.triggerOnRegionSelection({rowMin: rowMin, rowMax: rowMax, colMin: colMin, colMax: colMax});
+        this.regionSelectionCallbacks.trigger({rowMin: rowMin, rowMax: rowMax, colMin: colMin, colMax: colMax});
     }
 
     /**
@@ -178,7 +188,8 @@ class region_selector extends HTMLElement {
         if (colMax !== null) {
             this.xMaxSlider.setExternally({setValue: colMax, silent: true});
         }
-        this.triggerOnRegionSet({rowMin: rowMin, rowMax: rowMax, colMin: colMin, colMax: colMax});
+        // this.triggerOnRegionSet({rowMin: rowMin, rowMax: rowMax, colMin: colMin, colMax: colMax});
+        this.regionSetCallbacks.trigger({rowMin: rowMin, rowMax: rowMax, colMin: colMin, colMax: colMax});
     }
     
     /**
@@ -292,7 +303,8 @@ class region_selector extends HTMLElement {
         this.xMaxSlider.setButton();
         this.yMinSlider.setButton();
         this.yMaxSlider.setButton();
-        this.triggerOnRegionSet({
+        // this.triggerOnRegionSet({
+        this.regionSetCallbacks.trigger({
             rowMin: this.yMinSlider.setValue,
             rowMax: this.yMaxSlider.setValue,
             colMin: this.xMinSlider.setValue,

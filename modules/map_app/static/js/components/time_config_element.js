@@ -1,51 +1,10 @@
-// Previous structure:
+// time_config_element.js
 
-// <section id="time-settings">
-//     <label for="time-settings">Time Settings:</label>
-//     <div class="time-input" style="display: flex; flex-direction: column; margin-bottom: 10px;">
-//         <label for="target-time">Target Time:</label>
-//         <!-- <input type="datetime-local" id="target-time" name="target-time" value="2018-09-17T00:00"
-//             min="2018-09-17T00:00"> -->
-//         <!-- max date is today's date to be safe... can handle on JS end -->
-//         <input type="date" id="target-time" name="target-time" value="2025-07-04"
-//             min="2018-09-17">
-//     </div>
-//     <div class="lead-time-input">
-//         <label for="lead-time">Lead Time (hours):</label>
-//         <input type="range" id="lead-time" name="lead-time" value="1" min="1" max="18" step="1">
-//         <span id="lead-time-value">1</span>
-//     </div>
-//     <div class="forecast-cycle-input">
-//         <label for="forecast-cycle">Forecast Cycle:</label>
-//         <input type="range" id="forecast-cycle" name="forecast-cycle" value="0" min="0" max="23"
-//             step="1">
-//         <span id="forecast-cycle-value">0</span>
-//     </div>
-//     <div class="selected-values" style="outline: 1px solid #ccc; padding: 3px; margin-top: 10px;">
-//         <!--Display the values as they were when the `set-time` button was last pressed-->
-//         <!--The user must press the button for this section to be populated-->
-//         <p>Selected Time: <span id="selected-time">None</span></p>
-//         <p>Selected Lead Time: <span id="selected-lead-time">None</span></p>
-//         <p>Selected Forecast Cycle: <span id="selected-forecast-cycle">None</span></p>
-//     </div>
-//     <button id="set-time">Set Time</button>
-// </section>
+// 'Imports' (Mark things we need from files that are loaded earlier in the HTML file)
 
-// Implementing new structure as time_config_element.js
-
-// Unlike the Scale and Region components, the value of individual sliders
-// are unimportant until the user requests the data using the "Set Time" button.
-// Therefore we do not need to use the double labeled slider component here.
-// The forecast cycle and lead time inputs can be simple sliders or number inputs.
-
-// Definitely unlike the original, we do not want to use datetime-local inputs,
-// as the time selection clashes with the forecast-cycle input 
-// (Forecast cycle determines the hour of the day for requests.)
-
-// At the same time, we need to begin preparing for the animation / time series
-// functionality, which means we need to allow for revealing an additional lead time
-// slider when the time series mode is activated.
-
+/**
+ * @import {CallbackDict} from '../utilities/callbacks.js';
+ */
 
 // Use a config object to avoid cluttering the global namespace
 // and to make it easier to change strings and IDs later if needed.
@@ -81,6 +40,13 @@ var time_config_config = {
     // const submit_button_string = 'Set Time';
     submit_button_string: 'Get Data',
     submit_button_id: 'submit-time-config',
+    submit_button_tooltip_string: 'Submit the selected time configuration and request forecast data for display on the map.',
+    download_button_string: 'Download Selected',
+    download_button_id: 'download-forecast-data',
+    download_button_tooltip_string: 'Download NetCDF files for the currently selected/displayed forecast data.',
+    download_fullres_button_string: 'Download Selected Full Resolution',
+    download_fullres_button_id: 'download-forecast-data-fullres',
+    download_fullres_button_tooltip_string: 'Download NetCDF files for the currently selected/displayed forecast data at full resolution (1kmx1km scale).',
 }
 
 /**
@@ -117,15 +83,21 @@ class time_config extends HTMLElement {
 
         // Important interface object:
         /**
-         * @type {Object.<string, onSubmitCallback>} 
-         * Functions to call when the submit button is pressed.
+         * @type {CallbackDict<onSubmitCallback>}
          */
-        this.onSubmitFuncs = {};
+        this.submitCallbacks = new CallbackDict();
         /**
-         * @type {Object.<string, onSubmitCallback>}
-         * Functions to call when something updates the selection display.
+         * @type {CallbackDict<onSubmitCallback>}
          */
-        this.onDisplaySelectFuncs = {};
+        this.displaySelectCallbacks = new CallbackDict();
+        /**
+         * @type {CallbackDict<onSubmitCallback>}
+         */
+        this.downloadCallbacks = new CallbackDict();
+        /**
+         * @type {CallbackDict<onSubmitCallback>}
+         */
+        this.fullResDownloadCallbacks = new CallbackDict();
 
         // Data attributes
         this.target_time = time_config_config.target_time_default_date; // expected to be '2025-07-04'
@@ -182,6 +154,8 @@ class time_config extends HTMLElement {
         // button to submit the selected values and request data
         // this.setTimeButton = null;
         this.submitButton = null;
+        this.downloadButton = null;
+        this.downloadFullResButton = null;
         // container element for the entire component
         this.containerElement = null;
 
@@ -191,80 +165,6 @@ class time_config extends HTMLElement {
     connectedCallback() {
         console.log('Time Config ' + this.uuid + ' triggered callback. Building...');
         this.build();
-    }
-
-    // onSubmit function helpers
-
-    /**
-     * Add a function to be called when the submit button is pressed.
-     * @param {string} key - The unique key to identify the function.
-     * @param {onSubmitCallback} func - The function to call on submit.
-     */
-    addOnSubmitFunction(key, func) {
-        if (this.onSubmitFuncs[key]) {
-            console.error('Function with key ' + key + ' already exists. Use a unique key.');
-            return;
-        }
-        this.onSubmitFuncs[key] = func;
-    }
-
-    /**
-     * Remove a previously added onSubmit function.
-     * @param {string} key - The unique key identifying the function to remove.
-     */
-    removeOnSubmitFunction(key) {
-        if (!this.onSubmitFuncs[key]) {
-            console.error('Function with key ' + key + ' does not exist.');
-            return;
-        }
-        delete this.onSubmitFuncs[key];
-    }
-
-    /**
-     * Call all registered onSubmit functions with the provided arguments.
-     * @param {timeConfigArgs} args - The arguments to pass to the onSubmit functions.
-     */
-    triggerOnSubmit(args) {
-        for (const key in this.onSubmitFuncs) {
-            this.onSubmitFuncs[key](args);
-        }
-    }
-
-    // onDisplaySelect function helpers
-
-    /**
-     * Add a function to be called when the selection display is updated.
-     * @param {string} key - The unique key to identify the function.
-     * @param {onSubmitCallback} func - The function to call on selection change.
-     */
-    addOnDisplaySelectFunction(key, func) {
-        if (this.onDisplaySelectFuncs[key]) {
-            console.error('Function with key ' + key + ' already exists. Use a unique key.');
-            return;
-        }
-        this.onDisplaySelectFuncs[key] = func;
-    }
-
-    /**
-     * Remove a previously added onDisplaySelect function.
-     * @param {string} key - The unique key identifying the function to remove.
-     */
-    removeOnDisplaySelectFunction(key) {
-        if (!this.onDisplaySelectFuncs[key]) {
-            console.error('Function with key ' + key + ' does not exist.');
-            return;
-        }
-        delete this.onDisplaySelectFuncs[key];
-    }
-    
-    /**
-     * Call all registered onDisplaySelect functions with the provided arguments.
-     * @param {timeConfigArgs} args - The arguments to pass to the onSelect functions.
-     */
-    triggerOnDisplaySelect(args) {
-        for (const key in this.onDisplaySelectFuncs) {
-            this.onDisplaySelectFuncs[key](args);
-        }
     }
 
     /**
@@ -355,7 +255,14 @@ class time_config extends HTMLElement {
         // this.selectedForecastCycleElement.textContent = this.selected_forecast_cycle || 'None';
         this.selectedForecastCycleElement.textContent = (this.selected_forecast_cycle !== null) ? this.selected_forecast_cycle : 'None';
         // Trigger any display select functions
-        this.triggerOnDisplaySelect({
+        // this.triggerOnDisplaySelect({
+        //     target_time: this.selected_target_time,
+        //     lead_time: this.selected_lead_time,
+        //     forecast_cycle: this.selected_forecast_cycle,
+        //     range_mode: this.selected_range_mode,
+        //     lead_time_end: this.selected_lead_time_end
+        // });
+        this.displaySelectCallbacks.trigger({
             target_time: this.selected_target_time,
             lead_time: this.selected_lead_time,
             forecast_cycle: this.selected_forecast_cycle,
@@ -663,16 +570,50 @@ class time_config extends HTMLElement {
      * @returns {HTMLDivElement} The submit button container element
      */
     buildSubmitButtonSegment() {
+        // segment of the component that contains the buttons
+        // that finalize the selection and interact with the data requesting
+        // functionality
+
+        // 2 rows, top has submit and download buttons, bottom has download full res button
+
         // button to submit the selected values and request data
         this.submitButton = document.createElement('button');
         this.submitButton.id = time_config_config.submit_button_id;
         this.submitButton.textContent = time_config_config.submit_button_string;
+        this.submitButton.title = time_config_config.submit_button_tooltip_string;
+
+        // Include the download button here as well in the same flex container
+        
+        this.downloadButton = document.createElement('button');
+        this.downloadButton.id = time_config_config.download_button_id;
+        this.downloadButton.textContent = time_config_config.download_button_string;
+        this.downloadButton.style.marginLeft = '10px';
+        this.downloadButton.title = time_config_config.download_button_tooltip_string;
+
+        this.downloadFullResButton = document.createElement('button');
+        this.downloadFullResButton.id = time_config_config.download_fullres_button_id;
+        this.downloadFullResButton.textContent = time_config_config.download_fullres_button_string;
+        this.downloadFullResButton.title = time_config_config.download_fullres_button_tooltip_string;
         
         const submitButtonContainer = document.createElement('div');
         submitButtonContainer.style.display = 'flex';
         submitButtonContainer.style.justifyContent = 'center';
         submitButtonContainer.style.marginTop = '10px';
-        submitButtonContainer.appendChild(this.submitButton);
+        submitButtonContainer.style.flexDirection = 'column';
+        
+        const topButtonRow = document.createElement('div');
+        topButtonRow.style.display = 'flex';
+        topButtonRow.style.justifyContent = 'center';
+        topButtonRow.appendChild(this.submitButton);
+        topButtonRow.appendChild(this.downloadButton);
+        submitButtonContainer.appendChild(topButtonRow);
+
+        const bottomButtonRow = document.createElement('div');
+        bottomButtonRow.style.display = 'flex';
+        bottomButtonRow.style.justifyContent = 'center';
+        bottomButtonRow.style.marginTop = '5px';
+        bottomButtonRow.appendChild(this.downloadFullResButton);
+        submitButtonContainer.appendChild(bottomButtonRow);
 
         return submitButtonContainer;
     }
@@ -796,7 +737,14 @@ class time_config extends HTMLElement {
             this.displaySelectedValues();
             // Trigger any registered onSubmit functions
             if (this.range_mode) {
-                this.triggerOnSubmit({
+                // this.triggerOnSubmit({
+                //     target_time: this.selected_target_time,
+                //     lead_time: this.selected_lead_time,
+                //     lead_time_end: this.selected_lead_time_end,
+                //     forecast_cycle: this.selected_forecast_cycle,
+                //     range_mode: this.selected_range_mode
+                // });
+                this.submitCallbacks.trigger({
                     target_time: this.selected_target_time,
                     lead_time: this.selected_lead_time,
                     lead_time_end: this.selected_lead_time_end,
@@ -804,13 +752,74 @@ class time_config extends HTMLElement {
                     range_mode: this.selected_range_mode
                 });
             } else {
-                this.triggerOnSubmit({
+                // this.triggerOnSubmit({
+                //     target_time: this.selected_target_time,
+                //     lead_time: this.selected_lead_time,
+                //     forecast_cycle: this.selected_forecast_cycle,
+                //     range_mode: this.selected_range_mode
+                // });
+                this.submitCallbacks.trigger({
                     target_time: this.selected_target_time,
                     lead_time: this.selected_lead_time,
                     forecast_cycle: this.selected_forecast_cycle,
                     range_mode: this.selected_range_mode
                 });
             }
+        });
+    }
+
+    /**
+     * Configure the download button events
+     */
+    configureDownloadButton() {
+        this.downloadButton.addEventListener('click', () => {
+            // First, check that there are selected values
+            if (this.selected_target_time === null ||
+                this.selected_lead_time === null ||
+                this.selected_forecast_cycle === null) {
+                console.warn('Download button pressed but no valid selection submitted.');
+                alert('Please submit a valid selection before downloading data.');
+                return;
+            }
+            // On download button click, trigger any registered onDownload functions
+            // this.triggerOnDownload({
+            //     target_time: this.selected_target_time,
+            //     lead_time: this.selected_lead_time,
+            //     lead_time_end: this.selected_lead_time_end,
+            //     forecast_cycle: this.selected_forecast_cycle,
+            //     range_mode: this.selected_range_mode
+            // });
+            this.downloadCallbacks.trigger({
+                target_time: this.selected_target_time,
+                lead_time: this.selected_lead_time,
+                lead_time_end: this.selected_lead_time_end,
+                forecast_cycle: this.selected_forecast_cycle,
+                range_mode: this.selected_range_mode
+            });
+        });
+    }
+
+    /**
+     * Configure the download full resolution button events
+     */
+    configureDownloadFullResButton() {
+        this.downloadFullResButton.addEventListener('click', () => {
+            // First, check that there are selected values
+            if (this.selected_target_time === null ||
+                this.selected_lead_time === null ||
+                this.selected_forecast_cycle === null) {
+                console.warn('Download Full Res button pressed but no valid selection submitted.');
+                alert('Please submit a valid selection before downloading data.');
+                return;
+            }
+            // On download full res button click, trigger any registered onDownloadFullRes functions
+            this.fullResDownloadCallbacks.trigger({
+                target_time: this.selected_target_time,
+                lead_time: this.selected_lead_time,
+                lead_time_end: this.selected_lead_time_end,
+                forecast_cycle: this.selected_forecast_cycle,
+                range_mode: this.selected_range_mode
+            });
         });
     }
 
@@ -853,6 +862,8 @@ class time_config extends HTMLElement {
         this.configureForecastCycleInput();
         this.configureTargetTimeInput();
         this.configureSubmitButton();
+        this.configureDownloadButton();
+        this.configureDownloadFullResButton();
 
         this.containerElement.appendChild(this.titleElement);
         this.containerElement.appendChild(targetTimeContainer);

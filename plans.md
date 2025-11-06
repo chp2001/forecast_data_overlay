@@ -151,3 +151,13 @@ Matching the legend to the size of the map container is proving difficult, as di
 Manual tuning *would* be possible, but breaks in the case of the map resizing for any reason, as well as breaking if the number of thresholds is changed.
 
 This is a work in progress.
+
+### Download Data Functionality
+
+Currently, there is no way for the user to download the data being displayed on the map.
+
+Given that we download the data from an external source, process it, and then send it to the client, it would be relatively straightforward to add a button that allows the user to download the data we have processed.
+
+This would likely involve adding a new button to the options panel, and a new API endpoint on the server that sends the processed data as a downloadable file.
+
+This is now complete.

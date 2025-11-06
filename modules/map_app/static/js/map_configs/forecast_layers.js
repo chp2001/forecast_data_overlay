@@ -588,7 +588,8 @@ map.on("click", "forecasted_precip_layer", (e) => {
 // RANGE SLIDER RELEVANT CODE
 // Set up interactivity with the time_config_element's prototype
 // range slider for adjusting the displayed data
-animationControlElement.onRangeSliderChangeFuncs['forecast_layers'] = (selectedLeadTime) => {
+// animationControlElement.onRangeSliderChangeFuncs['forecast_layers'] = (selectedLeadTime) => {
+animationControlElement.onRangeSliderChangeFuncs.add('forecast_layers', (selectedLeadTime) => {
     // console.log('Range slider changed, displaying data from new lead time:', selectedLeadTime);
     // Pull the data from the map's source data
     var featureCollection = map.getSource("forecasted_precip")._data;
@@ -596,4 +597,4 @@ animationControlElement.onRangeSliderChangeFuncs['forecast_layers'] = (selectedL
     updateFeatureCollectionWithTimeStep(featureCollection, selectedLeadTime);
     // Update the source data to refresh the map
     map.getSource("forecasted_precip").setData(featureCollection);
-}
+});

@@ -22,6 +22,7 @@
 // import the double-labeled-slider component from components/double_labeled_slider.js
 /**
  * @import { double_labeled_slider } from './double_labeled_slider.js';
+ * @import { CallbackDict } from '../utilities/callbacks.js';
  */
 
 class scale_config extends HTMLElement {
@@ -42,16 +43,25 @@ class scale_config extends HTMLElement {
 
         
 
+        // /**
+        //  * Functions to call when the scale is set
+        //  * @type {Object.<string, scaleSetCallback>}
+        //  */
+        // this.scaleSetCallbacks = {};
+        // /**
+        //  * Functions to call when the scale selection changes
+        //  * @type {Object.<string, scaleSelectionCallback>}
+        //  */
+        // this.scaleSelectionCallbacks = {};
+        // Using CallbackDict for easier management
         /**
-         * Functions to call when the scale is set
-         * @type {Object.<string, scaleSetCallback>}
+         * @type {CallbackDict<scaleSetCallback>}
          */
-        this.scaleSetCallbacks = {};
+        this.scaleSetCallbacks = new CallbackDict();
         /**
-         * Functions to call when the scale selection changes
-         * @type {Object.<string, scaleSelectionCallback>}
+         * @type {CallbackDict<scaleSelectionCallback>}
          */
-        this.scaleSelectionCallbacks = {};
+        this.scaleSelectionCallbacks = new CallbackDict();
 
         this.locked = true; // Whether the x and y scales are locked together
         this.uuid = scale_config.id++;
@@ -63,77 +73,77 @@ class scale_config extends HTMLElement {
         this.build();
     }
 
-    // Callback registration functions
-    /**
-     * Add a function to be called when any scale is set
-     * @param {string} key - A unique key to identify the callback
-     * @param {scaleSetCallback} func - The function to call when the scale is set
-     */
-    addOnScaleSetFunction(key, func) {
-        if (this.scaleSetCallbacks[key]) {
-            // fail loudly, this shouldn't happen
-            console.error('An onScaleSet callback with key ' + key + ' already exists. Choose a different key.');
-            return;
-        }
-        this.scaleSetCallbacks[key] = func;
-    }
-    /**
-     * Remove a previously added onScaleSet callback
-     * @param {string} key - The unique key identifying the callback to remove
-     */
-    removeOnScaleSetFunction(key) {
-        if (!this.scaleSetCallbacks[key]) {
-            console.error('No onScaleSet callback with key ' + key + ' exists. Cannot remove.');
-            return;
-        }
-        delete this.scaleSetCallbacks[key];
-    }
-    /**
-     * Trigger all registered onScaleSet callbacks
-     * @param {Object} options - The new scale values
-     * @param {number?} options.xScale - The new x scale value, or null if unchanged
-     * @param {number?} options.yScale - The new y scale value, or null if unchanged
-     */
-    triggerOnScaleSet(options) {
-        for (const key in this.scaleSetCallbacks) {
-            this.scaleSetCallbacks[key](options);
-        }
-    }
-    /**
-     * Add a function to be called when any scale selection changes
-     * @param {string} key - A unique key to identify the callback
-     * @param {scaleSelectionCallback} func - The function to call when the scale selection changes
-     */
-    addOnScaleSelectionFunction(key, func) {
-        if (this.scaleSelectionCallbacks[key]) {
-            // fail loudly, this shouldn't happen
-            console.error('An onScaleSelection callback with key ' + key + ' already exists. Choose a different key.');
-            return;
-        }
-        this.scaleSelectionCallbacks[key] = func;
-    }
-    /**
-     * Remove a previously added onScaleSelection callback
-     * @param {string} key - The unique key identifying the callback to remove
-     */
-    removeOnScaleSelectionFunction(key) {
-        if (!this.scaleSelectionCallbacks[key]) {
-            console.error('No onScaleSelection callback with key ' + key + ' exists. Cannot remove.');
-            return;
-        }
-        delete this.scaleSelectionCallbacks[key];
-    }
-    /**
-     * Trigger all registered onScaleSelection callbacks
-     * @param {Object} options - The new scale selection values
-     * @param {number?} options.xScale - The new x scale selection value, or null if unchanged
-     * @param {number?} options.yScale - The new y scale selection value, or null if unchanged
-     */
-    triggerOnScaleSelection(options) {
-        for (const key in this.scaleSelectionCallbacks) {
-            this.scaleSelectionCallbacks[key](options);
-        }
-    }
+    // // Callback registration functions
+    // /**
+    //  * Add a function to be called when any scale is set
+    //  * @param {string} key - A unique key to identify the callback
+    //  * @param {scaleSetCallback} func - The function to call when the scale is set
+    //  */
+    // addOnScaleSetFunction(key, func) {
+    //     if (this.scaleSetCallbacks[key]) {
+    //         // fail loudly, this shouldn't happen
+    //         console.error('An onScaleSet callback with key ' + key + ' already exists. Choose a different key.');
+    //         return;
+    //     }
+    //     this.scaleSetCallbacks[key] = func;
+    // }
+    // /**
+    //  * Remove a previously added onScaleSet callback
+    //  * @param {string} key - The unique key identifying the callback to remove
+    //  */
+    // removeOnScaleSetFunction(key) {
+    //     if (!this.scaleSetCallbacks[key]) {
+    //         console.error('No onScaleSet callback with key ' + key + ' exists. Cannot remove.');
+    //         return;
+    //     }
+    //     delete this.scaleSetCallbacks[key];
+    // }
+    // /**
+    //  * Trigger all registered onScaleSet callbacks
+    //  * @param {Object} options - The new scale values
+    //  * @param {number?} options.xScale - The new x scale value, or null if unchanged
+    //  * @param {number?} options.yScale - The new y scale value, or null if unchanged
+    //  */
+    // triggerOnScaleSet(options) {
+    //     for (const key in this.scaleSetCallbacks) {
+    //         this.scaleSetCallbacks[key](options);
+    //     }
+    // }
+    // /**
+    //  * Add a function to be called when any scale selection changes
+    //  * @param {string} key - A unique key to identify the callback
+    //  * @param {scaleSelectionCallback} func - The function to call when the scale selection changes
+    //  */
+    // addOnScaleSelectionFunction(key, func) {
+    //     if (this.scaleSelectionCallbacks[key]) {
+    //         // fail loudly, this shouldn't happen
+    //         console.error('An onScaleSelection callback with key ' + key + ' already exists. Choose a different key.');
+    //         return;
+    //     }
+    //     this.scaleSelectionCallbacks[key] = func;
+    // }
+    // /**
+    //  * Remove a previously added onScaleSelection callback
+    //  * @param {string} key - The unique key identifying the callback to remove
+    //  */
+    // removeOnScaleSelectionFunction(key) {
+    //     if (!this.scaleSelectionCallbacks[key]) {
+    //         console.error('No onScaleSelection callback with key ' + key + ' exists. Cannot remove.');
+    //         return;
+    //     }
+    //     delete this.scaleSelectionCallbacks[key];
+    // }
+    // /**
+    //  * Trigger all registered onScaleSelection callbacks
+    //  * @param {Object} options - The new scale selection values
+    //  * @param {number?} options.xScale - The new x scale selection value, or null if unchanged
+    //  * @param {number?} options.yScale - The new y scale selection value, or null if unchanged
+    //  */
+    // triggerOnScaleSelection(options) {
+    //     for (const key in this.scaleSelectionCallbacks) {
+    //         this.scaleSelectionCallbacks[key](options);
+    //     }
+    // }
 
     setSelection({xScale = null, yScale = null}={}) {
         // Single function rather than two separate functions,
@@ -147,7 +157,8 @@ class scale_config extends HTMLElement {
         if (yScale !== null) {
             this.yScaleSlider.setExternally({selectionValue: yScale, silent: true});
         }
-        this.triggerOnScaleSelection({xScale: xScale, yScale: yScale});
+        // this.triggerOnScaleSelection({xScale: xScale, yScale: yScale});
+        this.scaleSelectionCallbacks.trigger({xScale: xScale, yScale: yScale});
     }
 
     setSet({xScale = null, yScale = null}={}) {
@@ -162,7 +173,8 @@ class scale_config extends HTMLElement {
             // this.yScaleSlider.setValueFunc(yScale);
             this.yScaleSlider.setExternally({setValue: yScale, silent: true});
         }
-        this.triggerOnScaleSet({xScale: xScale, yScale: yScale});
+        // this.triggerOnScaleSet({xScale: xScale, yScale: yScale});
+        this.scaleSetCallbacks.trigger({xScale: xScale, yScale: yScale});
     }
 
     setFull({xScale = null, yScale = null}={}) {
@@ -214,7 +226,8 @@ class scale_config extends HTMLElement {
     onSetButtonClick() {
         this.xScaleSlider.setButton();
         this.yScaleSlider.setButton();
-        this.triggerOnScaleSet({
+        // this.triggerOnScaleSet({
+        this.scaleSetCallbacks.trigger({
             xScale: this.xScaleSlider.setValue,
             yScale: this.yScaleSlider.setValue
         });

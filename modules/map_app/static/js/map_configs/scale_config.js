@@ -1,5 +1,9 @@
 // Modify to use the new scale-config component
 /**
+ * @import {scale_config} from '../components/scale_config_element.js';
+ */
+
+/**
  * @type {scale_config}
  */
 const scaleConfigElement = document.getElementById('scale-config');
@@ -9,7 +13,8 @@ const scaleConfigElement = document.getElementById('scale-config');
 if (!scaleConfigElement) {
     throw new Error('Scale config element not found');
 }
-scaleConfigElement.addOnScaleSetFunction(
+// scaleConfigElement.addOnScaleSetFunction(
+scaleConfigElement.scaleSetCallbacks.add(
     'scale-config-cache-update',
     ({xScale = null, yScale = null}={}) => {
         if (xScale !== null) {
