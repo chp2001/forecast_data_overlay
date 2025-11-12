@@ -89,7 +89,9 @@ def makename(
     """Constructs the URL for accessing the NWM data file."""
     datetxt = f"nwm.{date.strftime('%Y%m%d')}"
     foldertxt = f"{run_type}{run_typesuffix}"
-    filetxt = f"nwm.t{fcst_cycle:02d}z.{run_name}{runsuffix}.{var_name}{varsuffix}.{fhprefix}{fcst_hour:03d}.{geography}.nc"
+    # 03d if not analysis_assim, 02d if analysis_assim
+    fh_str = f"{fcst_hour:03d}" if "analysis_assim" not in run_type else f"{fcst_hour:02d}"
+    filetxt = f"nwm.t{fcst_cycle:02d}z.{run_name}{runsuffix}.{var_name}{varsuffix}.{fhprefix}{fh_str}.{geography}.nc"
     return f"{urlbase_prefix}{datetxt}/{foldertxt}/{filetxt}"
 
 
