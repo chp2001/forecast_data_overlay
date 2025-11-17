@@ -651,12 +651,32 @@ class time_config extends HTMLElement {
         selectedValuesTitle.style.alignSelf = 'center';
         this.selectedValuesElement.appendChild(selectedValuesTitle);
 
-        this.selectedRunTypeLabel = document.createElement('p');
-        this.selectedRunTypeLabel.style.margin = '2px 0px';
-        this.selectedRunTypeLabel.innerHTML = time_config_config.selected_run_type_label_string;
-        this.selectedRunTypeElement = document.createElement('span');
-        this.selectedRunTypeElement.id = 'selected-run-type';
-        this.selectedRunTypeElement.textContent = 'None';
+        function makeDefaultSelectedLabel(text, id=null) {
+            const label = document.createElement('p');
+            label.style.margin = '2px 0px';
+            label.innerHTML = text;
+            if (id !== null) {
+                label.id = id;
+            }
+            return label;
+        }
+        function makeDefaultSelectedValue(text, id=null) {
+            const value = document.createElement('span');
+            value.textContent = text;
+            if (id !== null) {
+                value.id = id;
+            }
+            return value;
+        }
+
+        // this.selectedRunTypeLabel = document.createElement('p');
+        // this.selectedRunTypeLabel.style.margin = '2px 0px';
+        // this.selectedRunTypeLabel.innerHTML = time_config_config.selected_run_type_label_string;
+        // this.selectedRunTypeElement = document.createElement('span');
+        // this.selectedRunTypeElement.id = 'selected-run-type';
+        // this.selectedRunTypeElement.textContent = 'None';
+        this.selectedRunTypeLabel = makeDefaultSelectedLabel(time_config_config.selected_run_type_label_string);
+        this.selectedRunTypeElement = makeDefaultSelectedValue('None', 'selected-run-type');
         const selectedRunTypeContainer = document.createElement('div');
         selectedRunTypeContainer.style.display = 'flex';
         selectedRunTypeContainer.style.alignItems = 'center';
@@ -664,12 +684,14 @@ class time_config extends HTMLElement {
         selectedRunTypeContainer.appendChild(this.selectedRunTypeElement);
         this.selectedValuesElement.appendChild(selectedRunTypeContainer);
 
-        this.selectedTimeLabel = document.createElement('p');
-        this.selectedTimeLabel.style.margin = '2px 0px';
-        this.selectedTimeLabel.innerHTML = time_config_config.selected_time_label_string;
-        this.selectedTimeElement = document.createElement('span');
-        this.selectedTimeElement.id = 'selected-time';
-        this.selectedTimeElement.textContent = 'None';
+        // this.selectedTimeLabel = document.createElement('p');
+        // this.selectedTimeLabel.style.margin = '2px 0px';
+        // this.selectedTimeLabel.innerHTML = time_config_config.selected_time_label_string;
+        // this.selectedTimeElement = document.createElement('span');
+        // this.selectedTimeElement.id = 'selected-time';
+        // this.selectedTimeElement.textContent = 'None';
+        this.selectedTimeLabel = makeDefaultSelectedLabel(time_config_config.selected_time_label_string);
+        this.selectedTimeElement = makeDefaultSelectedValue('None', 'selected-time');
         const selectedTimeContainer = document.createElement('div');
         selectedTimeContainer.style.display = 'flex';
         selectedTimeContainer.style.alignItems = 'center';
@@ -677,12 +699,14 @@ class time_config extends HTMLElement {
         selectedTimeContainer.appendChild(this.selectedTimeElement);
         this.selectedValuesElement.appendChild(selectedTimeContainer);
 
-        this.selectedLeadTimeLabel = document.createElement('p');
-        this.selectedLeadTimeLabel.style.margin = '2px 0px';
-        this.selectedLeadTimeLabel.innerHTML = time_config_config.selected_lead_time_label_string;
-        this.selectedLeadTimeElement = document.createElement('span');
-        this.selectedLeadTimeElement.id = 'selected-lead-time';
-        this.selectedLeadTimeElement.textContent = 'None';
+        // this.selectedLeadTimeLabel = document.createElement('p');
+        // this.selectedLeadTimeLabel.style.margin = '2px 0px';
+        // this.selectedLeadTimeLabel.innerHTML = time_config_config.selected_lead_time_label_string;
+        // this.selectedLeadTimeElement = document.createElement('span');
+        // this.selectedLeadTimeElement.id = 'selected-lead-time';
+        // this.selectedLeadTimeElement.textContent = 'None';
+        this.selectedLeadTimeLabel = makeDefaultSelectedLabel(time_config_config.selected_lead_time_label_string);
+        this.selectedLeadTimeElement = makeDefaultSelectedValue('None', 'selected-lead-time');
         const selectedLeadTimeContainer = document.createElement('div');
         selectedLeadTimeContainer.style.display = 'flex';
         selectedLeadTimeContainer.style.alignItems = 'center';
@@ -690,12 +714,14 @@ class time_config extends HTMLElement {
         selectedLeadTimeContainer.appendChild(this.selectedLeadTimeElement);
         this.selectedValuesElement.appendChild(selectedLeadTimeContainer);
 
-        this.selectedForecastCycleLabel = document.createElement('p');
-        this.selectedForecastCycleLabel.style.margin = '2px 0px';
-        this.selectedForecastCycleLabel.innerHTML = time_config_config.selected_forecast_cycle_label_string;
-        this.selectedForecastCycleElement = document.createElement('span');
-        this.selectedForecastCycleElement.id = 'selected-forecast-cycle';
-        this.selectedForecastCycleElement.textContent = 'None';
+        // this.selectedForecastCycleLabel = document.createElement('p');
+        // this.selectedForecastCycleLabel.style.margin = '2px 0px';
+        // this.selectedForecastCycleLabel.innerHTML = time_config_config.selected_forecast_cycle_label_string;
+        // this.selectedForecastCycleElement = document.createElement('span');
+        // this.selectedForecastCycleElement.id = 'selected-forecast-cycle';
+        // this.selectedForecastCycleElement.textContent = 'None';
+        this.selectedForecastCycleLabel = makeDefaultSelectedLabel(time_config_config.selected_forecast_cycle_label_string);
+        this.selectedForecastCycleElement = makeDefaultSelectedValue('None', 'selected-forecast-cycle');
         const selectedForecastCycleContainer = document.createElement('div');
         selectedForecastCycleContainer.style.display = 'flex';
         selectedForecastCycleContainer.style.alignItems = 'center';
