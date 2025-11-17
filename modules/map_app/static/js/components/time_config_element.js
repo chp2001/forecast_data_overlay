@@ -181,6 +181,15 @@ class time_config extends HTMLElement {
     }
 
     /**
+     * Handler for selecting a run type. Modify both the attribute and the display element.
+     * @param {string} value - The selected run type
+     */
+    selectRunType(value) {
+        this.run_type = value;
+        this.runTypeElement.value = value;
+    }
+
+    /**
      * Handler for selecting a target date. Modify both the attribute and the display element.
      * @param {string} value - The selected target date in YYYY-MM-DD format
      */
@@ -384,6 +393,9 @@ class time_config extends HTMLElement {
         }
         if (run_type !== null) {
             this.selected_run_type = run_type;
+        } else {
+            // Assume default if not provided
+            this.selected_run_type = time_config_config.run_type_default;
         }
         this.displaySelectedValues();
     }
@@ -404,7 +416,10 @@ class time_config extends HTMLElement {
             this.selectLeadTimeEnd(lead_time_end);
         }
         if (run_type !== null) {
-            //this.selectRunType(run_type);
+            this.selectRunType(run_type);
+        } else {
+            // Assume default if not provided
+            this.selectRunType(time_config_config.run_type_default);
         }
     }
 
@@ -765,6 +780,15 @@ class time_config extends HTMLElement {
         return submitButtonContainer;
     }
 
+    /**
+     * Configure the run type select events
+     */
+    configureRunTypeSelect() {
+        this.runTypeElement.addEventListener('input', (event) => {
+            const value = event.target.value;
+            this.selectRunType(value);
+        });
+    }
     
 
     /**
@@ -876,6 +900,7 @@ class time_config extends HTMLElement {
     configureSubmitButton() {
         this.submitButton.addEventListener('click', () => {
             // On submit, update the selected values display
+            this.selected_run_type = this.run_type;
             this.selected_target_time = this.target_time;
             this.selected_range_mode = this.range_mode;
             this.selected_lead_time = this.lead_time;
@@ -896,7 +921,8 @@ class time_config extends HTMLElement {
                     lead_time: this.selected_lead_time,
                     lead_time_end: this.selected_lead_time_end,
                     forecast_cycle: this.selected_forecast_cycle,
-                    range_mode: this.selected_range_mode
+                    range_mode: this.selected_range_mode,
+                    run_type: this.selected_run_type
                 });
             } else {
                 // this.triggerOnSubmit({
@@ -909,7 +935,8 @@ class time_config extends HTMLElement {
                     target_time: this.selected_target_time,
                     lead_time: this.selected_lead_time,
                     forecast_cycle: this.selected_forecast_cycle,
-                    range_mode: this.selected_range_mode
+                    range_mode: this.selected_range_mode,
+                    run_type: this.selected_run_type
                 });
             }
         });
@@ -941,7 +968,8 @@ class time_config extends HTMLElement {
                 lead_time: this.selected_lead_time,
                 lead_time_end: this.selected_lead_time_end,
                 forecast_cycle: this.selected_forecast_cycle,
-                range_mode: this.selected_range_mode
+                range_mode: this.selected_range_mode,
+                run_type: this.selected_run_type
             });
         });
     }
@@ -965,7 +993,8 @@ class time_config extends HTMLElement {
                 lead_time: this.selected_lead_time,
                 lead_time_end: this.selected_lead_time_end,
                 forecast_cycle: this.selected_forecast_cycle,
-                range_mode: this.selected_range_mode
+                range_mode: this.selected_range_mode,
+                run_type: this.selected_run_type
             });
         });
     }
@@ -1007,6 +1036,7 @@ class time_config extends HTMLElement {
         const submitButtonContainer = this.buildSubmitButtonSegment();
 
         // Configure segment events
+        this.configureRunTypeSelect();
         this.configureRangeModeToggle();
         this.configureLeadTimeInput();
         this.configureLeadTimeEndInput();
