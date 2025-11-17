@@ -29,7 +29,7 @@ from forecasting_data.forcing_datasets import (
     get_timesteps_data_for_frontend,
 )
 from forecasting_data.urlgen_enums import NWMRun, NWMVar, NWMGeo, NWMMem
-
+from forecasting_data.urlgen_builder import make_partial_filepath
 from time import perf_counter
 from numpy import isclose, isnan
 
@@ -140,3 +140,59 @@ def parse_request_args(
         except Exception as e:
             raise ValueError(f"Error parsing argument {arg_name}: {e}") from e
     return parsed_args
+
+
+def make_file_unique_path(
+    date: str,
+    forecast_cycle: int,
+    lead_time: int,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    varname: NWMVar = NWMVar.FORCING,
+    geoname: NWMGeo = NWMGeo.CONUS,
+    meminput: Optional[NWMMem] = None,
+    region_bounds: Optional[Tuple[int, int, int, int]] = None,
+    scale_factors: Tuple[int, int] = (16, 16),
+    output_dir: Optional[Path] = Path("dist/downloads"),
+) -> Path:
+    """
+    Create a unique file path for a forecast dataset based on input parameters.
+
+    Args:
+        date: Date string in 'YYYYMMDD' format.
+        forecast_cycle: Forecast cycle hour (0-23).
+        lead_time: Lead time in hours.
+        runtype: NWMRun enum value.
+        varname: NWMVar enum value.
+        geoname: NWMGeo enum value.
+        meminput: Optional NWMMem enum value.
+        region_bounds: Optional tuple of (rowMin, rowMax, colMin, colMax) for clipping.
+        scale_factors: Tuple of (scaleX, scaleY) for downscaling. Defaults to (16, 16).
+        output_dir: Directory to save the file. Defaults to 'dist/downloads'.
+    Returns:
+        Path object representing the unique file path.
+    """
+    # Generate the partial filepath using the provided parameters
+    # Returns in format:
+    # nwm.20250704/forcing_short_range/nwm.t00z.short_range.forcing.f001.conus.nc
+    partial_filepath = make_partial_filepath(
+        date=date,
+        forecast_cycle=forecast_cycle,
+        lead_time=lead_time,
+        runtype=runtype,
+        varname=varname,
+        geoname=geoname,
+        meminput=meminput,
+    )
+    # Insert region bounds and scale factors into the filename to ensure uniqueness.
+    bounds_str = ""
+    if region_bounds is not None:
+        rowMin, rowMax, colMin, colMax = region_bounds
+        bounds_str = f"_r{rowMin}-{rowMax}_c{colMin}-{colMax}"
+    scale_str = f"_s{scale_factors[0]}x{scale_factors[1]}"
+    # Insert before the file extension
+    if partial_filepath.endswith(".nc"):
+        partial_filepath = partial_filepath.replace(".nc", f"{bounds_str}{scale_str}.nc")
+    else:
+        partial_filepath += f"{bounds_str}{scale_str}"
+    unique_path = output_dir / partial_filepath
+    return unique_path

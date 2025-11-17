@@ -90,9 +90,45 @@ def makename(
     datetxt = f"nwm.{date.strftime('%Y%m%d')}"
     foldertxt = f"{run_type}{run_typesuffix}"
     # 03d if not analysis_assim, 02d if analysis_assim
-    fh_str = f"{fcst_hour:03d}" if "analysis_assim" not in run_type else f"{fcst_hour:02d}"
+    fh_str = (
+        f"{fcst_hour:03d}"
+        if "analysis_assim" not in run_type and "long_range" not in run_type
+        else f"{fcst_hour:02d}"
+    )
     filetxt = f"nwm.t{fcst_cycle:02d}z.{run_name}{runsuffix}.{var_name}{varsuffix}.{fhprefix}{fh_str}.{geography}.nc"
     return f"{urlbase_prefix}{datetxt}/{foldertxt}/{filetxt}"
+
+
+# version of makename that does not rely on other function calls in the `create_file_list` function
+def make_partial_filepath(
+    date: str,
+    forecast_cycle: int,
+    lead_time: int,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    varname: NWMVar = NWMVar.FORCING,
+    geoname: NWMGeo = NWMGeo.CONUS,
+    meminput: Optional[NWMMem] = None,
+) -> str:
+    # should output something like:
+    # nwm.20250704/forcing_short_range/nwm.t00z.short_range.forcing.f001.conus.nc
+    # makename builds it as:
+    # nwm.{date}/{run_type}{run_typesuffix}/nwm.t{fcst_cycle:02d}z.{run_name}{runsuffix}.{var_name}{varsuffix}.{fhprefix}{fh_str}.{geography}.nc
+    result = f"nwm.{date}"  # first part, date already in correct format
+    meminput_suffix = (
+        f"_{meminput.value}" if meminput is not None else ""
+    )  # suffix based on meminput
+    run_name = runtype.name.lower()  # run name from runtype
+    var_name = varname.name.lower()  # var name from varname
+    geo_name = geoname.name.lower()  # geo name from geoname
+    run_type_str = run_type(runtype, varname, geoname, run_name)  # run type string
+    result += f"/{run_type_str}{meminput_suffix}"  # second part
+    result += f"/nwm.t{forecast_cycle:02d}z.{run_name}.{var_name}{meminput_suffix}."  # third, fourth, fifth parts
+    if "analysis_assim" in run_type_str or "long_range" in run_type_str:
+        result += f"tm{lead_time:02d}."  # sixth part
+    else:
+        result += f"f{lead_time:03d}."
+    result += f"{geo_name}.nc"  # last part
+    return result
 
 
 # def fhprefix(runinput):

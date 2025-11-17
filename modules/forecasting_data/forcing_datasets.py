@@ -563,6 +563,9 @@ def save_forecasted_dataset_with_options(
     rowMax: Optional[int] = None,
     colMin: Optional[int] = None,
     colMax: Optional[int] = None,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    geosource: NWMGeo = NWMGeo.CONUS,
+    mem: Optional[NWMMem] = None,
 ) -> None:
     """Save the processed forecasted dataset to a NetCDF file.
 
@@ -588,7 +591,11 @@ def save_forecasted_dataset_with_options(
         rowMax=rowMax,
         colMin=colMin,
         colMax=colMax,
+        runtype=runtype,
+        geosource=geosource,
+        mem=mem,
     )
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     dataset.to_netcdf(path=file_path)
 
 
