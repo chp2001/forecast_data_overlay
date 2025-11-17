@@ -553,7 +553,12 @@ map.on("click", "forecasted_precip_layer", (e) => {
 animationControlElement.onRangeSliderChangeFuncs.add('forecast_layers', (selectedLeadTime) => {
     // console.log('Range slider changed, displaying data from new lead time:', selectedLeadTime);
     // Pull the data from the map's source data
-    var featureCollection = map.getSource("forecasted_precip")._data;
+    var precip_source = map.getSource("forecasted_precip");
+    var featureCollection = getGeoJSONFromSource(precip_source);
+    if (!featureCollection) {
+        console.warn('No feature collection found in forecasted_precip source.');
+        return;
+    }
     // Update the feature collection with the new lead time's values
     updateFeatureCollectionWithTimeStep(featureCollection, selectedLeadTime);
     // Update the source data to refresh the map
