@@ -73,7 +73,8 @@ function requestForecastedPrecip(
     colMin = null,
     colMax = null,
     lead_time_end = null,
-    range_mode = null
+    range_mode = null,
+    runtype = null
 ) {
     if (scaleX === null) {
         scaleX = 16;
@@ -92,7 +93,8 @@ function requestForecastedPrecip(
         colMin: colMin,
         colMax: colMax,
         lead_time_end: lead_time_end,
-        range_mode: range_mode
+        range_mode: range_mode,
+        runtype: runtype
     }
     console.log('Requesting forecasted precipitation with args:', arg_body);
     return fetch('/get_forecast_precip', {
@@ -134,7 +136,8 @@ function downloadNetcdfData(
     colMin = null,
     colMax = null,
     lead_time_end = null,
-    range_mode = null
+    range_mode = null,
+    runtype = null
 ) {
     if (scaleX === null) {
         scaleX = 16;
@@ -153,7 +156,8 @@ function downloadNetcdfData(
         colMin: colMin,
         colMax: colMax,
         lead_time_end: lead_time_end,
-        range_mode: range_mode
+        range_mode: range_mode,
+        runtype: runtype
     }
     console.log('Requesting netcdf download with args:', arg_body);
     return fetch("/download_forecast_precip", {

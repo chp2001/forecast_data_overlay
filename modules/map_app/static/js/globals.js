@@ -69,7 +69,8 @@ var local_cache = {
     lead_time: null,
     forecast_cycle: null,
     lead_time_end: null,
-    range_mode: null
+    range_mode: null,
+    runtype: null,
 };
 
 /**
@@ -105,4 +106,90 @@ var noaa_threshold_color_sets = {
         { min: 0.1, color: `rgb(59, 121, 187)`}, // lightish-blue
         { min: 0.01, color: `rgb(43, 192, 245)`}, // very-light-blue or cyan
     ]
+}
+
+/**
+ * @typedef {Object} DataSourceOption
+ * @property {string} name - Descriptive name of the data source
+ * @property {Object} forecast_cycle - Configuration for forecast cycle selection
+ * @property {number} forecast_cycle.min - Minimum forecast cycle value
+ * @property {number} forecast_cycle.max - Maximum forecast cycle value
+ * @property {number} forecast_cycle.interval - Interval between forecast cycle values
+ * @property {string} forecast_cycle.label - Label for the forecast cycle selector
+ * @property {Object} lead_time - Configuration for lead time selection
+ * @property {number} lead_time.min - Minimum lead time value
+ * @property {number} lead_time.max - Maximum lead time value
+ * @property {number} lead_time.interval - Interval between lead time values
+ * @property {string} lead_time.label - Label for the lead time selector
+ */
+
+/**
+ * @type {Object<string, DataSourceOption>}
+ * @description
+ * Configuration options for different data sources, including
+ * forecast cycle and lead time settings.
+ */
+var data_source_options = {
+    "short_range": {
+        name: "Short Range Forecast (up to 24 hours)",
+        forecast_cycle: {
+            min: 0,
+            max: 23,
+            interval: 1,
+            label: "Forecast Cycle"
+        },
+        lead_time: {
+            min: 1,
+            max: 18,
+            interval: 1,
+            label: "Lead Time"
+        }
+    },
+    "medium_range": {
+        name: "Medium Range Forecast (up to 7 days)",
+        forecast_cycle: {
+            min: 0,
+            max: 18,
+            interval: 6,
+            label: "Forecast Cycle"
+        },
+        lead_time: {
+            min: 1,
+            max: 240,
+            interval: 1,
+            label: "Lead Time"
+        }
+    },
+    // "long_range": {
+    //     name: "Long Range Forecast (up to 30 days)",
+    //     forecast_cycle: {
+    //         min: 0,
+    //         max: 18,
+    //         interval: 6,
+    //         label: "Forecast Cycle"
+    //     },
+    //     lead_time: {
+    //         min: 24,
+    //         max: 720,
+    //         interval: 3,
+    //         label: "Lead Time"
+    //     }
+    // }
+    // Long range doesn't work for forcing data
+    "analysis_assim": {
+        name: "analysis_assim (Analysis / Assimilation)",
+        forecast_cycle: {
+            min: 0,
+            max: 19,
+            interval: 1,
+            label: "Forecast Cycle"
+        },
+        lead_time: {
+            // 0, 1, 2
+            min: 0,
+            max: 2,
+            interval: 1,
+            label: "'tm'(?)"
+        }
+    }
 }

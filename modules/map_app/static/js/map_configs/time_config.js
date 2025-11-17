@@ -73,7 +73,7 @@ if (use_old_time_config) {
     // timeConfigElement.addOnSubmitFunction(
     timeConfigElement.submitCallbacks.add(
         'time-config-cache-update',
-        ({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null}={}) => {
+        ({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null, runtype=null}={}) => {
             // Received target_time is YYYY-MM-DD, convert it to YYYYMMDD
             var formattedTime = target_time.replace(/-/g, '');
             // local_cache["target_time"] = target_time;
@@ -86,6 +86,9 @@ if (use_old_time_config) {
             if (lead_time_end !== null) {
                 local_cache["lead_time_end"] = lead_time_end;
             }
+            if (runtype !== null) {
+                local_cache["runtype"] = runtype;
+            }
             console.log('Updated local_cache time settings to:', {
                 target_time, lead_time, forecast_cycle, range_mode, lead_time_end
             });
@@ -95,7 +98,7 @@ if (use_old_time_config) {
     // timeConfigElement.addOnDownloadFunction(
     timeConfigElement.downloadCallbacks.add(
         'forecasted-precip-download',
-        ({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null}={}) => {
+        ({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null, runtype=null}={}) => {
             // Received target_time is YYYY-MM-DD, convert it to YYYYMMDD
             var formattedTime = target_time.replace(/-/g, '');
             console.log('Download requested for forecasted precip with settings:', {
@@ -103,7 +106,8 @@ if (use_old_time_config) {
                 lead_time,
                 forecast_cycle,
                 range_mode,
-                lead_time_end
+                lead_time_end,
+                runtype
             });
             // Initiate download
             downloadNetcdfData(
@@ -117,13 +121,14 @@ if (use_old_time_config) {
                 local_cache["colMin"],
                 local_cache["colMax"],
                 lead_time_end,
-                range_mode
+                range_mode,
+                runtype
             );
         }
     );
     timeConfigElement.fullResDownloadCallbacks.add(
         'forecasted-precip-full-res-download',
-        ({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null}={}) => {
+        ({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null, runtype=null}={}) => {
             // Received target_time is YYYY-MM-DD, convert it to YYYYMMDD
             var formattedTime = target_time.replace(/-/g, '');
             console.log('Full resolution download requested for forecasted precip with settings:', {
@@ -131,7 +136,8 @@ if (use_old_time_config) {
                 lead_time,
                 forecast_cycle,
                 range_mode,
-                lead_time_end
+                lead_time_end,
+                runtype
             });
             // Initiate full resolution download
             // (Same as normal download but scaleX and scaleY are 1)
@@ -146,7 +152,8 @@ if (use_old_time_config) {
                 local_cache["colMin"],
                 local_cache["colMax"],
                 lead_time_end,
-                range_mode
+                range_mode,
+                runtype
             );
         }
     );

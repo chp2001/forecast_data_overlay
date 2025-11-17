@@ -511,6 +511,9 @@ def load_forecasted_dataset_with_options(
     rowMax: Optional[int] = None,
     colMin: Optional[int] = None,
     colMax: Optional[int] = None,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    geosource: NWMGeo = NWMGeo.CONUS,
+    mem: Optional[NWMMem] = None,
 ) -> xr.Dataset:
     """Use caching to make repeated access to the same data faster by
     running the calculations previously in `views.py::get_forecast_precip`
@@ -530,7 +533,14 @@ def load_forecasted_dataset_with_options(
     Returns:
         xr.Dataset: The processed xarray Dataset. For download or otherwise.
     """
-    dataset = load_forecasted_forcing(date=date, forecast_cycle=forecast_cycle, lead_time=lead_time)
+    dataset = load_forecasted_forcing(
+        date=date,
+        forecast_cycle=forecast_cycle,
+        lead_time=lead_time,
+        runtype=runtype,
+        geosource=geosource,
+        mem=mem,
+    )
     if all(v is not None for v in [rowMin, rowMax, colMin, colMax]):
         rangeAdjustX = 16 if scaleX is not None else scaleX
         rangeAdjustY = 16 if scaleY is not None else scaleY
@@ -553,6 +563,9 @@ def save_forecasted_dataset_with_options(
     rowMax: Optional[int] = None,
     colMin: Optional[int] = None,
     colMax: Optional[int] = None,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    geosource: NWMGeo = NWMGeo.CONUS,
+    mem: Optional[NWMMem] = None,
 ) -> None:
     """Save the processed forecasted dataset to a NetCDF file.
 
@@ -578,7 +591,11 @@ def save_forecasted_dataset_with_options(
         rowMax=rowMax,
         colMin=colMin,
         colMax=colMax,
+        runtype=runtype,
+        geosource=geosource,
+        mem=mem,
     )
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     dataset.to_netcdf(path=file_path)
 
 
@@ -593,6 +610,9 @@ def load_forecasted_forcing_with_options(
     rowMax: Optional[int] = None,
     colMin: Optional[int] = None,
     colMax: Optional[int] = None,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    geosource: NWMGeo = NWMGeo.CONUS,
+    mem: Optional[NWMMem] = None,
 ) -> Tuple[xr.DataArray, pyproj.Transformer]:
     """Use caching to make repeated access to the same data faster by
     running the calculations previously in `views.py::get_forecast_precip`
@@ -614,7 +634,14 @@ def load_forecasted_forcing_with_options(
             - Precipitation data as an xarray DataArray.
             - A pyproj Transformer to convert from the dataset's projection to EPSG:4326.
     """
-    dataset = load_forecasted_forcing(date=date, forecast_cycle=forecast_cycle, lead_time=lead_time)
+    dataset = load_forecasted_forcing(
+        date=date,
+        forecast_cycle=forecast_cycle,
+        lead_time=lead_time,
+        runtype=runtype,
+        geosource=geosource,
+        mem=mem,
+    )
     precip_data = dataset["RAINRATE"]
     if all(v is not None for v in [rowMin, rowMax, colMin, colMax]):
         rangeAdjustX = 16 if scaleX is not None else scaleX
@@ -638,6 +665,9 @@ def get_timestep_data_for_frontend(
     rowMax: Optional[int] = None,
     colMin: Optional[int] = None,
     colMax: Optional[int] = None,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    geosource: NWMGeo = NWMGeo.CONUS,
+    mem: Optional[NWMMem] = None,
     **kwargs,
 ) -> Dict[str, List]:
     """
@@ -656,6 +686,9 @@ def get_timestep_data_for_frontend(
         rowMax,
         colMin,
         colMax,
+        runtype,
+        geosource,
+        mem,
     )
 
 
@@ -670,6 +703,9 @@ def _get_timestep_data_for_frontend(
     rowMax: Optional[int] = None,
     colMin: Optional[int] = None,
     colMax: Optional[int] = None,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    geosource: NWMGeo = NWMGeo.CONUS,
+    mem: Optional[NWMMem] = None,
 ) -> Dict[str, List]:
     """
     Migrated functionality from `views.py::get_forecast_precip` to a function,
@@ -707,6 +743,9 @@ def _get_timestep_data_for_frontend(
         rowMax=rowMax,
         colMin=colMin,
         colMax=colMax,
+        runtype=runtype,
+        geosource=geosource,
+        mem=mem,
     )
     precip_data_array_np = precip_data_array.to_numpy()
     t1 = perf_counter()
@@ -761,6 +800,9 @@ def _get_timestep_values_for_frontend(
     rowMax: Optional[int] = None,
     colMin: Optional[int] = None,
     colMax: Optional[int] = None,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    geosource: NWMGeo = NWMGeo.CONUS,
+    mem: Optional[NWMMem] = None,
 ) -> List[float]:
     """
     For multi-timestep data, we may want to get all values before deciding
@@ -799,6 +841,9 @@ def _get_timestep_values_for_frontend(
         rowMax=rowMax,
         colMin=colMin,
         colMax=colMax,
+        runtype=runtype,
+        geosource=geosource,
+        mem=mem,
     )
     precip_data_array_np = precip_data_array.to_numpy()
     t1 = perf_counter()
@@ -835,6 +880,9 @@ def get_timesteps_data_for_frontend(
     rowMax: Optional[int] = None,
     colMin: Optional[int] = None,
     colMax: Optional[int] = None,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    geosource: NWMGeo = NWMGeo.CONUS,
+    mem: Optional[NWMMem] = None,
     **kwargs,
 ) -> Tuple[Dict[int, List[float]], List[geom_t]]:
     """
@@ -859,6 +907,9 @@ def get_timesteps_data_for_frontend(
         rowMax,
         colMin,
         colMax,
+        runtype,
+        geosource,
+        mem,
     )
 
 
@@ -874,6 +925,9 @@ def _get_timesteps_data_for_frontend(
     rowMax: Optional[int] = None,
     colMin: Optional[int] = None,
     colMax: Optional[int] = None,
+    runtype: NWMRun = NWMRun.SHORT_RANGE,
+    geosource: NWMGeo = NWMGeo.CONUS,
+    mem: Optional[NWMMem] = None,
 ) -> Tuple[Dict[int, List[float]], List[geom_t]]:
     """
     Get the values for multiple lead times, and a single common geometry set.
@@ -924,6 +978,9 @@ def _get_timesteps_data_for_frontend(
                 rowMax,
                 colMin,
                 colMax,
+                runtype=runtype,
+                geosource=geosource,
+                mem=mem,
             )
             sub_times.append(perf_counter())
             lead_time_values.append(values)
@@ -946,6 +1003,9 @@ def _get_timesteps_data_for_frontend(
         rowMax=rowMax,
         colMin=colMin,
         colMax=colMax,
+        runtype=runtype,
+        geosource=geosource,
+        mem=mem,
     )
     precip_data_array_np = precip_data_array.to_numpy()
     t2 = perf_counter()

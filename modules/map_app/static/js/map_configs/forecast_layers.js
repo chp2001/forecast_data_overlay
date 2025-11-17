@@ -490,6 +490,7 @@ function updateForecastedPrecipOverlay() {
     const colMax = local_cache["colMax"];
     const lead_time_end = local_cache["lead_time_end"];
     const range_mode = local_cache["range_mode"];
+    const runtype = local_cache["runtype"];
     return requestForecastedPrecip(
         targetTime,
         leadTime,
@@ -501,7 +502,8 @@ function updateForecastedPrecipOverlay() {
         colMin,
         colMax,
         lead_time_end,
-        range_mode
+        range_mode,
+        runtype
     ).then(data => {
         if (data) {
             // Update data_cache

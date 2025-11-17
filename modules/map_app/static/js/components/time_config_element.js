@@ -4,6 +4,7 @@
 
 /**
  * @import {CallbackDict} from '../utilities/callbacks.js';
+ * @import {DataSourceOption, data_source_options} from '../globals.js';
  */
 
 // Use a config object to avoid cluttering the global namespace
@@ -23,6 +24,9 @@ var time_config_config = {
     lead_time_default: 1,
     lead_time_end_label_string: 'Lead Time End:',
     lead_time_end_element_id: 'lead-time-end-input',
+    run_type_label_string: 'Run Type:',
+    run_type_default: 'short_range',
+    run_type_element_id: 'run-type-input',
     // lead time / lead time end coupling behavior:
     // choose between:
     // 1. constrain: disallow movement of one past the other
@@ -37,6 +41,7 @@ var time_config_config = {
     selected_lead_time_label_string: 'Selected Lead Time: ',
     selected_lead_times_label_string: 'Selected Lead Times (range): ',
     selected_forecast_cycle_label_string: 'Selected Forecast Cycle: ',
+    selected_run_type_label_string: 'Selected Run Type: ',
     // const submit_button_string = 'Set Time';
     submit_button_string: 'Get Data',
     submit_button_id: 'submit-time-config',
@@ -56,6 +61,7 @@ var time_config_config = {
  * @property {number} forecast_cycle - The forecast cycle value
  * @property {boolean|null} range_mode - True if range mode is enabled, false otherwise
  * @property {number|null} lead_time_end - The lead time end value (only if range mode)
+ * @property {string|null} runtype - The run type (e.g., 'short_range', 'medium_range')
  */
 
 /**
@@ -100,6 +106,7 @@ class time_config extends HTMLElement {
         this.fullResDownloadCallbacks = new CallbackDict();
 
         // Data attributes
+        this.runtype = time_config_config.run_type_default; // expected to be 'short_range'
         this.target_time = time_config_config.target_time_default_date; // expected to be '2025-07-04'
         this.lead_time = time_config_config.lead_time_default; // expected to be 1
         this.forecast_cycle = time_config_config.forecast_cycle_default; // expected to be 0
@@ -115,6 +122,7 @@ class time_config extends HTMLElement {
         this.data_step_forecast_cycle = 1;
 
         // Selected values (as of last submit)
+        this.selected_run_type = null;
         this.selected_target_time = null;
         this.selected_range_mode = null;
         this.selected_lead_time = null;
@@ -124,6 +132,9 @@ class time_config extends HTMLElement {
         // Element references
         // header/title
         this.titleElement = null;
+        // selector for run type
+        this.runTypeElement = null;
+        this.runTypeLabel = null;
         // selector for the target date
         this.targetTimeElement = null;
         this.targetTimeLabel = null;
@@ -145,6 +156,8 @@ class time_config extends HTMLElement {
         this.forecastCycleLabel = null;
         // display of selected values (as of last submit)
         this.selectedValuesElement = null; // container for selected values
+        this.selectedRunTypeElement = null; // display for selected run type
+        this.selectedRunTypeLabel = null;
         this.selectedTimeElement = null; // display for selected target time
         this.selectedTimeLabel = null;
         this.selectedLeadTimeElement = null; // display for selected lead time(s)
@@ -165,6 +178,18 @@ class time_config extends HTMLElement {
     connectedCallback() {
         console.log('Time Config ' + this.uuid + ' triggered callback. Building...');
         this.build();
+    }
+
+    /**
+     * Handler for selecting a run type. Modify both the attribute and the display element.
+     * @param {string} value - The selected run type
+     */
+    selectRunType(value) {
+        this.runtype = value;
+        this.runTypeElement.value = value;
+        var option = data_source_options[value];
+        this.reconfigureLeadTimeConstraints(option.lead_time.min, option.lead_time.max, option.lead_time.interval);
+        this.reconfigureForecastCycleConstraints(option.forecast_cycle.min, option.forecast_cycle.max, option.forecast_cycle.interval);
     }
 
     /**
@@ -237,11 +262,93 @@ class time_config extends HTMLElement {
     }
 
     /**
+     * Update the lead time input properties based on the data constraints.
+     * Called when data constraints change.
+     */
+    updateLeadTimeInputProperties() {
+        this.leadTimeElement.min = this.data_min_lead_time;
+        this.leadTimeElement.max = this.data_max_lead_time;
+        this.leadTimeElement.step = this.data_step_lead_time;
+        if (this.lead_time < this.data_min_lead_time) {
+            this.selectLeadTime(this.data_min_lead_time);
+        } else if (this.lead_time > this.data_max_lead_time) {
+            this.selectLeadTime(this.data_max_lead_time);
+        }
+        this.leadTimeEndElement.min = this.data_min_lead_time;
+        this.leadTimeEndElement.max = this.data_max_lead_time;
+        this.leadTimeEndElement.step = this.data_step_lead_time;
+        if (this.lead_time_end < this.data_min_lead_time) {
+            this.selectLeadTimeEnd(this.data_min_lead_time);
+        } else if (this.lead_time_end > this.data_max_lead_time) {
+            this.selectLeadTimeEnd(this.data_max_lead_time);
+        }
+    }
+
+    /**
+     * Update the forecast cycle input properties based on the data constraints.
+     * Called when data constraints change.
+     */
+    updateForecastCycleInputProperties() {
+        this.forecastCycleElement.min = this.data_min_forecast_cycle;
+        this.forecastCycleElement.max = this.data_max_forecast_cycle;
+        this.forecastCycleElement.step = this.data_step_forecast_cycle;
+        if (this.forecast_cycle < this.data_min_forecast_cycle) {
+            this.selectForecastCycle(this.data_min_forecast_cycle);
+        } else if (this.forecast_cycle > this.data_max_forecast_cycle) {
+            this.selectForecastCycle(this.data_max_forecast_cycle);
+        }
+    }
+
+    /**
+     * Reconfigure the lead time constraints and update the input properties accordingly.
+     * @param {number} min - The new minimum lead time
+     * @param {number} max - The new maximum lead time
+     * @param {number} step - The new lead time step
+     */
+    reconfigureLeadTimeConstraints(min, max, step) {
+        this.data_min_lead_time = min;
+        this.data_max_lead_time = max;
+        this.data_step_lead_time = step;
+        this.updateLeadTimeInputProperties();
+    }
+
+    /**
+     * Reconfigure the forecast cycle constraints and update the input properties accordingly.
+     * @param {number} min - The new minimum forecast cycle
+     * @param {number} max - The new maximum forecast cycle
+     * @param {number} step - The new forecast cycle step
+     */
+    reconfigureForecastCycleConstraints(min, max, step) {
+        this.data_min_forecast_cycle = min;
+        this.data_max_forecast_cycle = max;
+        this.data_step_forecast_cycle = step;
+        this.updateForecastCycleInputProperties();
+    }
+
+    /**
+     * Update runtype selection options based on data source options
+     */
+    updateRunTypeOptions() {
+        // Clear existing options
+        while (this.runTypeElement.firstChild) {
+            this.runTypeElement.removeChild(this.runTypeElement.firstChild);
+        }
+        // Add options from data_source_options
+        for (const [key, option] of Object.entries(data_source_options)) {
+            const optionElement = document.createElement('option');
+            optionElement.value = key;
+            optionElement.textContent = option.name;
+            this.runTypeElement.appendChild(optionElement);
+        }
+    }
+
+    /**
      * On submit, update the selected values with the requested values
      * and update the display elements accordingly.
      * This assumes the submit button has been pressed.
      */
     displaySelectedValues() {
+        this.selectedRunTypeElement.textContent = (this.selected_run_type !== null) ? this.selected_run_type : 'None';
         // this.selectedTimeElement.textContent = this.selected_target_time || 'None';
         this.selectedTimeElement.textContent = (this.selected_target_time !== null) ? this.selected_target_time : 'None';
         if (this.selected_range_mode === true && this.selected_lead_time !== this.selected_lead_time_end) {
@@ -267,7 +374,8 @@ class time_config extends HTMLElement {
             lead_time: this.selected_lead_time,
             forecast_cycle: this.selected_forecast_cycle,
             range_mode: this.selected_range_mode,
-            lead_time_end: this.selected_lead_time_end
+            lead_time_end: this.selected_lead_time_end,
+            runtype: this.selected_run_type
         });
     }
 
@@ -276,7 +384,7 @@ class time_config extends HTMLElement {
      * Will be called from the resume functionality.
      * @param {timeConfigArgs} param0 - Object containing the values to set
      */
-    externallySetPreviousValues({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null}={}) {
+    externallySetPreviousValues({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null, runtype=null}={}) {
         this.selected_target_time = target_time;
         this.selected_lead_time = lead_time;
         this.selected_forecast_cycle = forecast_cycle;
@@ -286,6 +394,12 @@ class time_config extends HTMLElement {
         if (lead_time_end !== null) {
             this.selected_lead_time_end = lead_time_end;
         }
+        if (runtype !== null) {
+            this.selected_run_type = runtype;
+        } else {
+            // Assume default if not provided
+            this.selected_run_type = time_config_config.run_type_default;
+        }
         this.displaySelectedValues();
     }
 
@@ -294,7 +408,7 @@ class time_config extends HTMLElement {
      * Will be called from the resume functionality.
      * @param {timeConfigArgs} param0 - Object containing the values to set
      */
-    externallySetInputValues({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null}={}) {
+    externallySetInputValues({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null, runtype=null}={}) {
         this.selectTargetTime(target_time);
         this.selectLeadTime(lead_time);
         this.selectForecastCycle(forecast_cycle);
@@ -304,6 +418,12 @@ class time_config extends HTMLElement {
         if (lead_time_end !== null) {
             this.selectLeadTimeEnd(lead_time_end);
         }
+        if (runtype !== null) {
+            this.selectRunType(runtype);
+        } else {
+            // Assume default if not provided
+            this.selectRunType(time_config_config.run_type_default);
+        }
     }
 
     /**
@@ -311,9 +431,35 @@ class time_config extends HTMLElement {
      * Will be called from the resume functionality.
      * @param {timeConfigArgs} param0 - Object containing the values to set
      */
-    externallySetFull({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null}={}) {
-        this.externallySetPreviousValues({target_time, lead_time, forecast_cycle, range_mode, lead_time_end});
-        this.externallySetInputValues({target_time, lead_time, forecast_cycle, range_mode, lead_time_end});
+    externallySetFull({target_time, lead_time, forecast_cycle, range_mode=null, lead_time_end=null, runtype=null}={}) {
+        this.externallySetPreviousValues({target_time, lead_time, forecast_cycle, range_mode, lead_time_end, runtype});
+        this.externallySetInputValues({target_time, lead_time, forecast_cycle, range_mode, lead_time_end, runtype});
+    }
+
+    /**
+     * Build the runtype segment of the component
+     * @returns {HTMLDivElement} The runtype segment element
+     */
+    buildRunTypeSegment() {
+        // Run type input
+        // Unlike other inputs being toggles, sliders, buttons, this is a select dropdown
+        this.runTypeElement = document.createElement('select');
+        this.runTypeElement.id = time_config_config.run_type_element_id;
+        this.runTypeElement.name = time_config_config.run_type_element_id;
+        this.updateRunTypeOptions();
+
+        this.runTypeLabel = document.createElement('label');
+        this.runTypeLabel.htmlFor = time_config_config.run_type_element_id;
+        this.runTypeLabel.textContent = time_config_config.run_type_label_string;
+
+        const runTypeContainer = document.createElement('div');
+        runTypeContainer.className = 'run-type-input';
+        runTypeContainer.style.display = 'flex';
+        runTypeContainer.style.flexDirection = 'column';
+        runTypeContainer.style.marginBottom = '10px';
+        runTypeContainer.appendChild(this.runTypeLabel);
+        runTypeContainer.appendChild(this.runTypeElement);
+        return runTypeContainer;
     }
 
     /**
@@ -523,12 +669,37 @@ class time_config extends HTMLElement {
         selectedValuesTitle.style.alignSelf = 'center';
         this.selectedValuesElement.appendChild(selectedValuesTitle);
 
-        this.selectedTimeLabel = document.createElement('p');
-        this.selectedTimeLabel.style.margin = '2px 0px';
-        this.selectedTimeLabel.innerHTML = time_config_config.selected_time_label_string;
-        this.selectedTimeElement = document.createElement('span');
-        this.selectedTimeElement.id = 'selected-time';
-        this.selectedTimeElement.textContent = 'None';
+        function makeDefaultSelectedLabel(text, id=null) {
+            const label = document.createElement('p');
+            label.style.margin = '2px 0px';
+            label.innerHTML = text;
+            if (id !== null) {
+                label.id = id;
+            }
+            return label;
+        }
+        function makeDefaultSelectedValue(text, id=null) {
+            const value = document.createElement('span');
+            value.textContent = text;
+            if (id !== null) {
+                value.id = id;
+            }
+            return value;
+        }
+
+        // Selected run type
+        this.selectedRunTypeLabel = makeDefaultSelectedLabel(time_config_config.selected_run_type_label_string);
+        this.selectedRunTypeElement = makeDefaultSelectedValue('None', 'selected-run-type');
+        const selectedRunTypeContainer = document.createElement('div');
+        selectedRunTypeContainer.style.display = 'flex';
+        selectedRunTypeContainer.style.alignItems = 'center';
+        selectedRunTypeContainer.appendChild(this.selectedRunTypeLabel);
+        selectedRunTypeContainer.appendChild(this.selectedRunTypeElement);
+        this.selectedValuesElement.appendChild(selectedRunTypeContainer);
+
+        // Selected time
+        this.selectedTimeLabel = makeDefaultSelectedLabel(time_config_config.selected_time_label_string);
+        this.selectedTimeElement = makeDefaultSelectedValue('None', 'selected-time');
         const selectedTimeContainer = document.createElement('div');
         selectedTimeContainer.style.display = 'flex';
         selectedTimeContainer.style.alignItems = 'center';
@@ -536,12 +707,9 @@ class time_config extends HTMLElement {
         selectedTimeContainer.appendChild(this.selectedTimeElement);
         this.selectedValuesElement.appendChild(selectedTimeContainer);
 
-        this.selectedLeadTimeLabel = document.createElement('p');
-        this.selectedLeadTimeLabel.style.margin = '2px 0px';
-        this.selectedLeadTimeLabel.innerHTML = time_config_config.selected_lead_time_label_string;
-        this.selectedLeadTimeElement = document.createElement('span');
-        this.selectedLeadTimeElement.id = 'selected-lead-time';
-        this.selectedLeadTimeElement.textContent = 'None';
+        // Selected lead time(s)
+        this.selectedLeadTimeLabel = makeDefaultSelectedLabel(time_config_config.selected_lead_time_label_string);
+        this.selectedLeadTimeElement = makeDefaultSelectedValue('None', 'selected-lead-time');
         const selectedLeadTimeContainer = document.createElement('div');
         selectedLeadTimeContainer.style.display = 'flex';
         selectedLeadTimeContainer.style.alignItems = 'center';
@@ -549,12 +717,9 @@ class time_config extends HTMLElement {
         selectedLeadTimeContainer.appendChild(this.selectedLeadTimeElement);
         this.selectedValuesElement.appendChild(selectedLeadTimeContainer);
 
-        this.selectedForecastCycleLabel = document.createElement('p');
-        this.selectedForecastCycleLabel.style.margin = '2px 0px';
-        this.selectedForecastCycleLabel.innerHTML = time_config_config.selected_forecast_cycle_label_string;
-        this.selectedForecastCycleElement = document.createElement('span');
-        this.selectedForecastCycleElement.id = 'selected-forecast-cycle';
-        this.selectedForecastCycleElement.textContent = 'None';
+        // Selected forecast cycle
+        this.selectedForecastCycleLabel = makeDefaultSelectedLabel(time_config_config.selected_forecast_cycle_label_string);
+        this.selectedForecastCycleElement = makeDefaultSelectedValue('None', 'selected-forecast-cycle');
         const selectedForecastCycleContainer = document.createElement('div');
         selectedForecastCycleContainer.style.display = 'flex';
         selectedForecastCycleContainer.style.alignItems = 'center';
@@ -618,6 +783,15 @@ class time_config extends HTMLElement {
         return submitButtonContainer;
     }
 
+    /**
+     * Configure the run type select events
+     */
+    configureRunTypeSelect() {
+        this.runTypeElement.addEventListener('input', (event) => {
+            const value = event.target.value;
+            this.selectRunType(value);
+        });
+    }
     
 
     /**
@@ -729,6 +903,7 @@ class time_config extends HTMLElement {
     configureSubmitButton() {
         this.submitButton.addEventListener('click', () => {
             // On submit, update the selected values display
+            this.selected_run_type = this.runtype;
             this.selected_target_time = this.target_time;
             this.selected_range_mode = this.range_mode;
             this.selected_lead_time = this.lead_time;
@@ -749,7 +924,8 @@ class time_config extends HTMLElement {
                     lead_time: this.selected_lead_time,
                     lead_time_end: this.selected_lead_time_end,
                     forecast_cycle: this.selected_forecast_cycle,
-                    range_mode: this.selected_range_mode
+                    range_mode: this.selected_range_mode,
+                    runtype: this.selected_run_type
                 });
             } else {
                 // this.triggerOnSubmit({
@@ -762,7 +938,8 @@ class time_config extends HTMLElement {
                     target_time: this.selected_target_time,
                     lead_time: this.selected_lead_time,
                     forecast_cycle: this.selected_forecast_cycle,
-                    range_mode: this.selected_range_mode
+                    range_mode: this.selected_range_mode,
+                    runtype: this.selected_run_type
                 });
             }
         });
@@ -794,7 +971,8 @@ class time_config extends HTMLElement {
                 lead_time: this.selected_lead_time,
                 lead_time_end: this.selected_lead_time_end,
                 forecast_cycle: this.selected_forecast_cycle,
-                range_mode: this.selected_range_mode
+                range_mode: this.selected_range_mode,
+                runtype: this.selected_run_type
             });
         });
     }
@@ -818,7 +996,8 @@ class time_config extends HTMLElement {
                 lead_time: this.selected_lead_time,
                 lead_time_end: this.selected_lead_time_end,
                 forecast_cycle: this.selected_forecast_cycle,
-                range_mode: this.selected_range_mode
+                range_mode: this.selected_range_mode,
+                runtype: this.selected_run_type
             });
         });
     }
@@ -844,9 +1023,13 @@ class time_config extends HTMLElement {
         this.titleElement = document.createElement('label');
         this.titleElement.htmlFor = 'time-settings';
         this.titleElement.textContent = time_config_config.title_string;
+        this.titleElement.style.fontWeight = 'bold';
+        this.titleElement.style.alignSelf = 'center';
+        this.titleElement.style.marginBottom = '10px';
         
         // Build segments
 
+        const runTypeContainer = this.buildRunTypeSegment();
         const targetTimeContainer = this.buildTargetTimeSegment();
         const rangeModeContainer = this.buildRangeModeToggleSegment();
         const leadTimeContainer = this.buildLeadTimeSegment();
@@ -856,6 +1039,7 @@ class time_config extends HTMLElement {
         const submitButtonContainer = this.buildSubmitButtonSegment();
 
         // Configure segment events
+        this.configureRunTypeSelect();
         this.configureRangeModeToggle();
         this.configureLeadTimeInput();
         this.configureLeadTimeEndInput();
@@ -866,6 +1050,7 @@ class time_config extends HTMLElement {
         this.configureDownloadFullResButton();
 
         this.containerElement.appendChild(this.titleElement);
+        this.containerElement.appendChild(runTypeContainer);
         this.containerElement.appendChild(targetTimeContainer);
         this.containerElement.appendChild(forecastCycleContainer);
         this.containerElement.appendChild(rangeModeContainer);

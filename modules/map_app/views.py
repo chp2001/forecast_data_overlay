@@ -30,6 +30,7 @@ from forecasting_data.forcing_datasets import (
     load_forecasted_dataset_with_options,
     save_forecasted_dataset_with_options,
 )
+from forecasting_data.urlgen_enums import NWMRun, NWMVar, NWMGeo, NWMMem
 
 from time import perf_counter
 from numpy import isclose, isnan
@@ -342,7 +343,12 @@ def tryget_resume_session():
         return jsonify({"error": "No session data found"}), 404
 
 
-from views_utils import get_endpoint_request_obj, parse_request_args, forecast_precip_args
+from map_app.views_utils import (
+    get_endpoint_request_obj,
+    parse_request_args,
+    forecast_precip_args,
+    make_file_unique_path,
+)
 
 
 @main.route("/test_request", methods=["POST"])
@@ -372,6 +378,7 @@ def get_forecast_precip():
     colMax: Optional[int] = parsed_args["colMax"]
     lead_time_end: Optional[int] = parsed_args["lead_time_end"]
     range_mode: bool = parsed_args["range_mode"]
+    runtype: NWMRun = parsed_args["runtype"]
     t1 = perf_counter()  # After reading request data / intra_module_db
     if t1 - t0 > 1.0:
         print(f"Reading and parsing request data took {t1 - t0:.2f} seconds")
@@ -469,6 +476,7 @@ def download_forecast_precip():
     colMax: Optional[int] = parsed_args["colMax"]
     lead_time_end: Optional[int] = parsed_args["lead_time_end"]
     range_mode: bool = parsed_args["range_mode"]
+    runtype: NWMRun = parsed_args["runtype"]
     t1 = perf_counter()  # After reading request data / intra_module_db
     if t1 - t0 > 1.0:
         print(f"Reading and parsing request data took {t1 - t0:.2f} seconds")
@@ -521,12 +529,26 @@ def download_forecast_precip():
             output_name += f"_r{rowMin}-{rowMax}_c{colMin}-{colMax}"
         return output_name
 
+    saved_paths: list[Path] = []
     if not range_mode:
         # # No range of lead times, single timestep only
-        output_name = make_file_name(
-            selected_time, forecast_cycle, lead_time, scaleX, scaleY, rowMin, rowMax, colMin, colMax
+        # output_name = make_file_name(
+        #     selected_time, forecast_cycle, lead_time, scaleX, scaleY, rowMin, rowMax, colMin, colMax
+        # )
+        # file_path = download_dir / f"{output_name}.nc"
+        file_path = make_file_unique_path(
+            date=selected_time,
+            forecast_cycle=forecast_cycle,
+            lead_time=lead_time,
+            runtype=runtype,
+            region_bounds=(
+                (rowMin, rowMax, colMin, colMax)
+                if all(v is not None for v in [rowMin, rowMax, colMin, colMax])
+                else None
+            ),
+            scale_factors=(scaleX, scaleY),
+            output_dir=download_dir,
         )
-        file_path = download_dir / f"{output_name}.nc"
         save_forecasted_dataset_with_options(
             file_path=file_path,
             date=selected_time,
@@ -538,7 +560,9 @@ def download_forecast_precip():
             rowMax=rowMax,
             colMin=colMin,
             colMax=colMax,
+            runtype=runtype,
         )
+        saved_paths.append(file_path)
         t3 = perf_counter()  # After saving to file
         if t3 - t2 > 1.0:
             print(f"Saving dataset to file took {t3 - t2:.2f} seconds")
@@ -546,10 +570,23 @@ def download_forecast_precip():
         targeted_lead_times = list(range(lead_time, lead_time_end + 1))
         save_times = []
         for lt in targeted_lead_times:
-            output_name = make_file_name(
-                selected_time, forecast_cycle, lt, scaleX, scaleY, rowMin, rowMax, colMin, colMax
+            # output_name = make_file_name(
+            #     selected_time, forecast_cycle, lt, scaleX, scaleY, rowMin, rowMax, colMin, colMax
+            # )
+            # file_path = download_dir / f"{output_name}.nc"
+            file_path = make_file_unique_path(
+                date=selected_time,
+                forecast_cycle=forecast_cycle,
+                lead_time=lt,
+                runtype=runtype,
+                region_bounds=(
+                    (rowMin, rowMax, colMin, colMax)
+                    if all(v is not None for v in [rowMin, rowMax, colMin, colMax])
+                    else None
+                ),
+                scale_factors=(scaleX, scaleY),
+                output_dir=download_dir,
             )
-            file_path = download_dir / f"{output_name}.nc"
             save_forecasted_dataset_with_options(
                 file_path=file_path,
                 date=selected_time,
@@ -561,7 +598,9 @@ def download_forecast_precip():
                 rowMax=rowMax,
                 colMin=colMin,
                 colMax=colMax,
+                runtype=runtype,
             )
+            saved_paths.append(file_path)
             curr_time = perf_counter()
             if len(save_times) == 0:
                 elapsed = curr_time - t2
@@ -584,4 +623,7 @@ def download_forecast_precip():
             f"(breakdown: read/validate {t2 - t0:.2f}s, save {t3 - t2:.2f}s)"
         )
     )
-    return jsonify({"message": "Files saved successfully"}), 200
+    success_message = "Saved files: " + ", ".join([str(p.resolve()) for p in saved_paths])
+    logger.info(success_message)
+    # return jsonify({"message": "Files saved successfully"}), 200
+    return jsonify({"message": success_message}), 200
