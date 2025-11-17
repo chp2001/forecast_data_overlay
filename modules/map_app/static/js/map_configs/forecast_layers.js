@@ -79,6 +79,23 @@ map.on("load", () => {
     });
 });
 
+/**
+ * Get GeoJSON data from a Maplibre source
+ * @param {maplibregl.Source} source 
+ * @returns {Object} GeoJSON data
+ */
+function getGeoJSONFromSource(source) {
+    var data = source._data;
+    if (!data) {
+        console.warn('Source has no data:', source);
+        return null;
+    } else if (data.geojson) {
+        return data.geojson;
+    } else {
+        return data;
+    }
+}
+
 // Populate the forecasting gridlines on the map
 function updateForecastingGridlines() {
     // Fetch the forecasting gridlines data from the server
@@ -149,7 +166,10 @@ function updateForecastingGridlines() {
 function highlightRegionBounds(rowMin, rowMax, colMin, colMax) {
     // Selects the edge gridlines to highlight the selected region
     // rowMin, rowMax, colMin, colMax are integers
-    const features = map.getSource("forecasting_gridlines")._data.features;
+    var gridline_source = map.getSource("forecasting_gridlines");
+    var geojson_data = getGeoJSONFromSource(gridline_source);
+    const features = geojson_data.features;
+
     var regionFeatures = [];
     for (let feature of features) {
         if (feature.id.startsWith("horiz-")) {
@@ -181,7 +201,10 @@ function highlightRegionBounds(rowMin, rowMax, colMin, colMax) {
 function highlightCandidateRegionBounds(rowMin, rowMax, colMin, colMax) {
     // Selects the edge gridlines to highlight the candidate selected region
     // rowMin, rowMax, colMin, colMax are integers
-    const features = map.getSource("forecasting_gridlines")._data.features;
+    // const features = map.getSource("forecasting_gridlines")._data.features;
+    var gridline_source = map.getSource("forecasting_gridlines");
+    var geojson_data = getGeoJSONFromSource(gridline_source);
+    const features = geojson_data.features;
     var regionFeatures = [];
     // violet for candidate region
     const candidateColor = "rgba(255, 0, 255, 1)";
@@ -426,68 +449,6 @@ function updateFeatureCollectionWithTimeStep(featureCollection, timestep) {
 
 // Function to update the forecasted precipitation overlay with received data
 var receivedData = null;
-const allowHandlingMultiTimestep = false; 
-// Logic is not finished yet, so if false, we ignore timesteps past the first if more than one is received
-function updateForecastLayer_old(data) {
-    if (typeof data === 'string') {
-        data = JSON.parse(data); // Ensure data is parsed correctly
-    }
-    receivedData = data;
-
-    if (!allowHandlingMultiTimestep && data["timestep_values"]) {
-        // timestep_values is a dict of {timestep: [values]}
-        // We want to only take the first timestep and its values
-        var timesteps = Object.keys(data["timestep_values"]);
-        // Sort timesteps numerically
-        timesteps.sort((a, b) => parseInt(a) - parseInt(b));
-        var firstTimestep = timesteps[0];
-        console.log('Received multiple timesteps, only using the first one:', firstTimestep);
-        data["values"] = data["timestep_values"][firstTimestep];
-    }
-    // Swapped the 2D list of points and values for 1D lists of geometries and their values
-    const geoms = data["geometries"];
-    const values = data["values"];
-    // For each point, create a polygon feature using the neighboring points
-    var features = [];
-    for (let i = 0; i < geoms.length; i++) {
-        const geom = geoms[i];
-        const value = values[i];
-        // The geometry is a list of four points that form a rectangle
-        if (geom.length < 4) {
-            console.warn('Geometry has less than 4 points, skipping:', geom);
-            continue; // Skip geometries that don't have enough points
-        }
-        const centerX = (geom[0][0] + geom[2][0]) / 2;
-        const centerY = (geom[0][1] + geom[2][1]) / 2;
-        features.push({
-            type: "Feature",
-            geometry: {
-                type: "Polygon",
-                coordinates: [[
-                    [geom[0][0], geom[0][1]],
-                    [geom[1][0], geom[1][1]],
-                    [geom[2][0], geom[2][1]],
-                    [geom[3][0], geom[3][1]],
-                    [geom[0][0], geom[0][1]], // Close the polygon
-                ]]
-            },
-            properties: {
-                color: "rgba(0, 0, 0, 0)", // Temporary, will be set later
-                value: 0.0, // Temporary, will be set later
-                center: [centerX, centerY] // Add center point for popup
-            }
-        });
-    }
-    var featureCollection = {
-        type: "FeatureCollection",
-        features: features
-    };
-    // Apply colors to the features based on their values
-    applyColorsToFeatureCollection(featureCollection);
-    // Update the source data
-    map.getSource("forecasted_precip").setData(featureCollection);
-    console.log('Forecasted precipitation overlay updated with data:', data);
-}
 
 function updateForecastLayer(data) {
     // Assume data is already parsed correctly

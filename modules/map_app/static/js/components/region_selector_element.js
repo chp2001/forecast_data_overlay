@@ -229,7 +229,8 @@ class region_selector extends HTMLElement {
             });
         } else {
             // Else, just trigger the change
-            this.triggerOnRegionSelection({rowMin: value, rowMax: null, colMin: null, colMax: null});
+            // this.triggerOnRegionSelection({rowMin: value, rowMax: null, colMin: null, colMax: null});
+            this.regionSelectionCallbacks.trigger({rowMin: value, rowMax: null, colMin: null, colMax: null});
         }
     }
 
@@ -247,7 +248,8 @@ class region_selector extends HTMLElement {
             });
         } else {
             // Else, just trigger the change
-            this.triggerOnRegionSelection({rowMin: null, rowMax: value, colMin: null, colMax: null});
+            // this.triggerOnRegionSelection({rowMin: null, rowMax: value, colMin: null, colMax: null});
+            this.regionSelectionCallbacks.trigger({rowMin: null, rowMax: value, colMin: null, colMax: null});
         }
     }
 
@@ -265,7 +267,8 @@ class region_selector extends HTMLElement {
             });
         } else {
             // Else, just trigger the change
-            this.triggerOnRegionSelection({rowMin: null, rowMax: null, colMin: value, colMax: null});
+            // this.triggerOnRegionSelection({rowMin: null, rowMax: null, colMin: value, colMax: null});
+            this.regionSelectionCallbacks.trigger({rowMin: null, rowMax: null, colMin: value, colMax: null});
         }
     }
 
@@ -283,7 +286,8 @@ class region_selector extends HTMLElement {
             });
         } else {
             // Else, just trigger the change
-            this.triggerOnRegionSelection({rowMin: null, rowMax: null, colMin: null, colMax: value});
+            // this.triggerOnRegionSelection({rowMin: null, rowMax: null, colMin: null, colMax: value});
+            this.regionSelectionCallbacks.trigger({rowMin: null, rowMax: null, colMin: null, colMax: value});
         }
     }
 
@@ -292,7 +296,8 @@ class region_selector extends HTMLElement {
      * @param {regionBoundArgs} changed - The changed values
      */
     onRegionSelectionChange(changed) {
-        this.triggerOnRegionSelection(changed);
+        // this.triggerOnRegionSelection(changed);
+        this.regionSelectionCallbacks.trigger(changed);
     }
 
     /**
