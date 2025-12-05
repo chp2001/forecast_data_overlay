@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from forecasting_data.forecast_datasets import load_dataset_from_json
 
 if __name__ == "__main__":
     import sys
@@ -25,6 +24,7 @@ import pickle
 import pyproj
 from functools import cache
 
+from forecasting_data.forecast_datasets import load_dataset_from_json
 
 if __name__ == "__main__":
     test_crs_accessibility = False

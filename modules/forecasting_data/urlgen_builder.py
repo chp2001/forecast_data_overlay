@@ -109,6 +109,9 @@ def make_partial_filepath(
     geoname: NWMGeo = NWMGeo.CONUS,
     meminput: Optional[NWMMem] = None,
 ) -> str:
+    assert (
+        isinstance(date, str) and len(date) == 8
+    ), f"date must be a string in 'YYYYMMDD' format, got ({date=})"
     # should output something like:
     # nwm.20250704/forcing_short_range/nwm.t00z.short_range.forcing.f001.conus.nc
     # makename builds it as:
@@ -619,27 +622,27 @@ def generate_urls(
     return file_list
 
 
-if __name__ == "__main__":
-    # Test the file list generation
-    # urlgennwm.generate_urls(
-    #     start_date="202507040000",
-    #     end_date="202507040000",
-    #     fcst_cycle=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
-    #     lead_time=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-    #     varinput=1,
-    #     geoinput=1,
-    #     runinput=1,
-    #     target_file=file_dest,
-    # )
-    file_urls = create_file_list_range(
-        runinput=NWMRun.SHORT_RANGE,
-        varinput=NWMVar.CHANNEL_RT,
-        geoinput=NWMGeo.CONUS,
-        start_date="202507040000",
-        end_date="202507040000",
-        fcst_cycle=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
-        lead_time=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-        urlbaseinput=8,  # Match the default URL base used in the original code
+def generate_url_single(
+    date: str,
+    fcst_cycle: int,
+    lead_time: int,
+    runinput: NWMRun = NWMRun.SHORT_RANGE,
+    varinput: NWMVar = NWMVar.FORCING,
+    geoinput: NWMGeo = NWMGeo.CONUS,
+    meminput: Optional[NWMMem] = None,
+    urlbaseinput: Optional[int] = 8,
+) -> str:
+    """Generates a single URL based on the provided parameters."""
+    urlbase_prefix = selecturlbase(urlbasedict, urlbaseinput)
+
+    partial_filepath = make_partial_filepath(
+        date,
+        fcst_cycle,
+        lead_time,
+        runinput,
+        varinput,
+        geoinput,
+        meminput,
     )
-    for url in file_urls:
-        print(url)
+
+    return f"{urlbase_prefix}{partial_filepath}"
