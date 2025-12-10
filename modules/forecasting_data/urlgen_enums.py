@@ -1,9 +1,16 @@
 from __future__ import annotations
 from enum import Enum
-from typing import Dict, List, NamedTuple, Tuple, Union
+from typing import Dict, List, NamedTuple, Optional, Tuple, TypeAlias, Union
 
 
-class NWMRun(Enum):
+class __SortableEnum(Enum):
+    def __lt__(self, other: __SortableEnum) -> bool:
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return self.value < other.value
+
+
+class NWMRun(__SortableEnum):
     SHORT_RANGE = 1
     MEDIUM_RANGE = 2
     MEDIUM_RANGE_NO_DA = 3
@@ -17,7 +24,7 @@ class NWMRun(Enum):
     SHORT_RANGE_NO_DA = 11
 
 
-class NWMMem(Enum):
+class NWMMem(__SortableEnum):
     MEM_1 = 1
     MEM_2 = 2
     MEM_3 = 3
@@ -27,7 +34,7 @@ class NWMMem(Enum):
     MEM_7 = 7
 
 
-class NWMVar(Enum):
+class NWMVar(__SortableEnum):
     CHANNEL_RT = 1
     LAND = 2
     RESERVOIR = 3
@@ -35,7 +42,7 @@ class NWMVar(Enum):
     FORCING = 5
 
 
-class NWMGeo(Enum):
+class NWMGeo(__SortableEnum):
     CONUS = 1
     HAWAII = 2
     PUERTO_RICO = 3
@@ -73,4 +80,80 @@ AvailabilityNodeType = Dict[Enum, Union["AvailabilityNodeType", Tuple[List[int],
 # NWMRun.ANALYSIS_ASSIM_NO_DA / NWMVar.CHANNEL_RT
 # NWMRun.SHORT_RANGE_NO_DA / NWMVar.CHANNEL_RT / NWMGeo.PUERTO_RICO
 
-AvailabilityTree: Dict[Enum, AvailabilityNodeType] = {}
+# AvailabilityTree: Dict[Enum, AvailabilityNodeType] = {}
+AvailabilityTree: Dict[
+    NWMGeo,
+    Dict[
+        NWMRun,
+        Dict[
+            NWMVar,
+            Union[
+                Dict[Optional[NWMMem], Tuple[Tuple[int, int, int], Tuple[int, int, int]]],
+                Tuple[Tuple[int, int, int], Tuple[int, int, int]],
+            ],
+        ],
+    ],
+] = {
+    NWMGeo.CONUS: {
+        NWMRun.SHORT_RANGE: {
+            NWMVar.CHANNEL_RT: ((0, 24, 1), (1, 19, 1)),
+            NWMVar.LAND: ((0, 24, 1), (1, 19, 1)),
+            NWMVar.RESERVOIR: ((0, 24, 1), (1, 19, 1)),
+            NWMVar.TERRAIN_RT: ((0, 24, 1), (1, 19, 1)),
+            NWMVar.FORCING: ((0, 24, 1), (1, 19, 1)),
+        },
+        NWMRun.MEDIUM_RANGE: {
+            NWMVar.CHANNEL_RT: ((0, 19, 6), (3, 241, 3)),
+            NWMVar.LAND: ((0, 19, 6), (3, 241, 3)),
+            NWMVar.RESERVOIR: ((0, 19, 6), (3, 241, 3)),
+            NWMVar.TERRAIN_RT: ((0, 19, 6), (3, 241, 3)),
+            NWMVar.FORCING: ((0, 19, 6), (1, 241, 1)),
+        },
+        NWMRun.LONG_RANGE: {
+            NWMVar.CHANNEL_RT: {
+                NWMMem.MEM_1: ((0, 19, 6), (6, 721, 6)),
+                NWMMem.MEM_2: ((0, 19, 6), (6, 721, 6)),
+                NWMMem.MEM_3: ((0, 19, 6), (6, 721, 6)),
+                NWMMem.MEM_4: ((0, 19, 6), (6, 721, 6)),
+            },
+            NWMVar.LAND: {
+                NWMMem.MEM_1: ((0, 19, 6), (24, 721, 24)),
+                NWMMem.MEM_2: ((0, 19, 6), (24, 721, 24)),
+                NWMMem.MEM_3: ((0, 19, 6), (24, 721, 24)),
+                NWMMem.MEM_4: ((0, 19, 6), (24, 721, 24)),
+            },
+            NWMVar.RESERVOIR: {
+                NWMMem.MEM_1: ((0, 19, 6), (6, 721, 6)),
+                NWMMem.MEM_2: ((0, 19, 6), (6, 721, 6)),
+                NWMMem.MEM_3: ((0, 19, 6), (6, 721, 6)),
+                NWMMem.MEM_4: ((0, 19, 6), (6, 721, 6)),
+            },
+        },
+        NWMRun.ANALYSIS_ASSIM: {
+            NWMVar.CHANNEL_RT: ((0, 24, 1), (0, 3, 1)),
+            NWMVar.LAND: ((0, 24, 1), (0, 3, 1)),
+            NWMVar.RESERVOIR: ((0, 24, 1), (0, 3, 1)),
+            NWMVar.TERRAIN_RT: ((0, 24, 1), (0, 3, 1)),
+            NWMVar.FORCING: ((0, 24, 1), (0, 3, 1)),
+        },
+    },
+}
+"""AvailabilityTree structure describing available NWM forecast data.
+
+The tree is structured as a nested dictionary with the following hierarchy:
+    1st level: NWMGeo
+    2nd level: NWMRun
+    3rd level: NWMVar
+    4th level: Optional[NWMMem] or direct tuple of patterns if only meminput None exists
+
+
+Each leaf node contains a tuple of range definitions for forecast cycles and lead times.
+The range definitions are tuples of (start, end, step) values.
+
+Example usage:
+    fcst_cycle_pattern, lead_time_pattern = AvailabilityTree[...][...][...]
+    # in the case where no meminput is available for that combination
+
+Generated from the following source's nwm.20180918 data:
+    https://ciroh-nwm-zarr-copy.s3.amazonaws.com/
+"""
